@@ -14,6 +14,7 @@
 
 // Set time offsets
 #define SlowDataUpdatePeriod 1000  // Time between CAN Messages sent
+#define DistanceUpdatePeriod 5000  
 #define TempSendOffset 0
 
 uint8_t gN2KSource = 22;
@@ -26,6 +27,8 @@ String gStatusSensor = "";
 
 uint16_t gTankHeight = 1000;
 uint16_t gTankfilled = 0;
+uint8_t gTankPercentFilled = 0;
+RingBuf<uint16_t, 30> myRingBuffer;
 
 
 char Version[] = "0.0.0.1 (2023-07-25)"; // Manufacturer's Software version code
@@ -142,65 +145,94 @@ void SetNextUpdate(unsigned long& NextUpdate, unsigned long Period) {
     while (NextUpdate < millis()) NextUpdate += Period;
 }
 
-void GetDistance() {
-    float lux = Sensor.alsPoLLMeasurement();
-    String str = "ALS: " + String(lux) + " lux";
-    Serial.println(str);
-    uint8_t range = Sensor.rangePollMeasurement();
-    uint8_t status = Sensor.getRangeResult();
+uint16_t GetAverageDistance() {
+    uint16_t SumTankFilled = 0;
+    uint16_t Average = 0;
 
-        
-
-    switch (status) {
-    case VL6180X_NO_ERR:
-        gStatusSensor = "Ok";
-        Serial.print(F("Range: "));
-        Serial.print(String(range));
-        Serial.println(F(" mm"));
-
-        gTankfilled = gTankHeight - range;
-        gFluidLevel = gTankHeight / 100 * gTankfilled;
-
-        break;
-    case VL6180X_EARLY_CONV_ERR:
-        gStatusSensor = "RANGE ERR: ECE check failed !";
-        gFluidLevel = 99;
-        break;
-    case VL6180X_MAX_CONV_ERR:
-        gStatusSensor = "RANGE ERR: System did not converge before the specified max!";
-        gFluidLevel = 99;
-        break;
-    case VL6180X_IGNORE_ERR:
-        gStatusSensor = "RANGE ERR: Ignore threshold check failed !";
-        gFluidLevel = 99;
-        break;
-    case VL6180X_MAX_S_N_ERR:
-        gStatusSensor = "RANGE ERR: Measurement invalidated!";
-        gFluidLevel = 99;
-        break;
-    case VL6180X_RAW_Range_UNDERFLOW_ERR:
-        gStatusSensor = "RANGE ERR: RESULT_RANGE_RAW < 0!";
-        gFluidLevel = 100;
-        break;
-    case VL6180X_RAW_Range_OVERFLOW_ERR:
-        gStatusSensor = "RESULT_RANGE_RAW is out of range !";
-        gFluidLevel = 0;
-        break;
-    case VL6180X_Range_UNDERFLOW_ERR:
-        gStatusSensor = "RANGE ERR: RESULT__RANGE_VAL < 0 !";
-        gFluidLevel = 100;
-        break;
-    case VL6180X_Range_OVERFLOW_ERR:
-        gStatusSensor = "RANGE ERR: RESULT__RANGE_VAL is out of range !";
-        gFluidLevel = 0;
-        break;
-    default:
-        gStatusSensor = "RANGE ERR: Systerm err!";
-        gFluidLevel = 99;
-        break;
+    for (uint8_t j = 0; j < gAverageTankFilled.size(); j++) {
+        SumTankFilled += gAverageTankFilled[j];
     }
 
-    Serial.println(gStatusSensor);
+    if (gAverageTankFilled.size() > 0) {
+        Average = SumTankFilled / gAverageTankFilled.size();
+    }
+
+    return Average;
+}
+
+void GetDistance() {
+
+    static unsigned long DistanceUpdateTime = InitNextUpdate(DistanceUpdatePeriod, 0);
+
+    if (IsTimeToUpdate(DistanceUpdateTime)) {
+        SetNextUpdate(DistanceUpdateTime, DistanceUpdatePeriod);
+
+        float lux = Sensor.alsPoLLMeasurement();
+        String str = "ALS: " + String(lux) + " lux";
+        Serial.println(str);
+        uint8_t range = Sensor.rangePollMeasurement();
+        uint8_t status = Sensor.getRangeResult();
+
+        switch (status) {
+        case VL6180X_NO_ERR:
+            gStatusSensor = "Ok";
+            Serial.print(F("Range: "));
+            Serial.print(String(range));
+            Serial.println(F(" mm"));
+
+            // gTankfilled = gTankHeight - range;
+            gAverageTankFilled.lockedPush(gTankHeight - range);
+            
+            gTankfilled = GetAverageDistance();
+            if (gTankfilled != 0) {
+                gTankPercentFilled = 100 * gTankfilled / gTankHeight; // %
+            }
+            else {
+                gTankPercentFilled = 0;
+            }
+            
+
+            break;
+        case VL6180X_EARLY_CONV_ERR:
+            gStatusSensor = "RANGE ERR: ECE check failed !";
+            gTankPercentFilled = 99;
+            break;
+        case VL6180X_MAX_CONV_ERR:
+            gStatusSensor = "RANGE ERR: System did not converge before the specified max!";
+            gTankPercentFilled = 99;
+            break;
+        case VL6180X_IGNORE_ERR:
+            gStatusSensor = "RANGE ERR: Ignore threshold check failed !";
+            gTankPercentFilled = 99;
+            break;
+        case VL6180X_MAX_S_N_ERR:
+            gStatusSensor = "RANGE ERR: Measurement invalidated!";
+            gTankPercentFilled = 99;
+            break;
+        case VL6180X_RAW_Range_UNDERFLOW_ERR:
+            gStatusSensor = "RANGE ERR: RESULT_RANGE_RAW < 0!";
+            gTankPercentFilled = 100;
+            break;
+        case VL6180X_RAW_Range_OVERFLOW_ERR:
+            gStatusSensor = "RESULT_RANGE_RAW is out of range !";
+            gTankPercentFilled = 0;
+            break;
+        case VL6180X_Range_UNDERFLOW_ERR:
+            gStatusSensor = "RANGE ERR: RESULT__RANGE_VAL < 0 !";
+            gTankPercentFilled = 100;
+            break;
+        case VL6180X_Range_OVERFLOW_ERR:
+            gStatusSensor = "RANGE ERR: RESULT__RANGE_VAL is out of range !";
+            gTankPercentFilled = 0;
+            break;
+        default:
+            gStatusSensor = "RANGE ERR: Systerm err!";
+            gTankPercentFilled = 99;
+            break;
+        }
+
+        Serial.println(gStatusSensor);
+    }
 }
 
 void SendN2kFluidLevel(void) {
@@ -232,6 +264,7 @@ void loop() {
 void loop2(void* parameter) {
     for (;;) {   // Endless loop
         wifiLoop();
+        GetDistance();
         vTaskDelay(100);
     }
 }

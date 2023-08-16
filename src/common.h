@@ -13,21 +13,24 @@
 
 #include "N2kMsg.h"
 #include "N2kTypes.h"
+#include "RingBuf.h"
 
 extern uint16_t gFluidCapacity;
-extern double gFluidLevel;
 
 extern tN2kFluidType gFluidType;
 
 extern String gStatusSensor;
 
-extern uint16_t gTankHeight;
-extern uint16_t gTankfilled;
+extern uint16_t gTankHeight; // mm
+extern uint16_t gTankfilled; // mm
+extern RingBuf gAverageTankFilled;
+extern uint8_t gTankPercentFilled; // %
 
 extern uint8_t gN2KSource;
 
 extern char Version[];
 
 extern bool gParamsChanged;
+
 
 #endif
