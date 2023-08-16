@@ -211,12 +211,14 @@ void handleRoot() {
 
     page += HTML_Start_Fieldset;
     page += HTML_Fieldset_Legend;
-    page.replace("{l}", "Tank");
+    String Title = Type + " tank";
+    page.replace("{l}", Title);
     page += HTML_Start_Table;
-        page += "<tr><td align=left>Fluid type: </td><td>" + Type + "</td></tr>";
+        page += "<tr><td align=left>Filled: </td><td>";
+        page += "<progress id=tank style=height:50px max=100 value=" + String(gTankPercentFilled) + ">" + String(gTankPercentFilled) + "%</progress>";
+        page += "</td></tr>";
+
         page += "<tr><td align=left>Volume: </td><td>" + String(gFluidCapacity) + " l" + "</td></tr>";
-        page += "<tr><td align=left>Height: </td><td>" + String(gTankHeight) + "  mm" + "</td></tr>";
-        page += "<tr><td align=left>Filled: </td><td>" + String(gTankfilled) + " mm" + "</td></tr>";
         page += "<tr><td align=left>Sensor Status:</td><td>" + String(gStatusSensor) + "</td></tr>";
 
 
