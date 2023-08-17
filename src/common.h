@@ -23,7 +23,7 @@ extern String gStatusSensor;
 
 extern uint16_t gTankHeight; // mm
 extern uint16_t gTankfilled; // mm
-extern RingBuf gAverageTankFilled;
+extern RingBuf<uint16_t, 30> gAverageTankFilled;
 extern uint8_t gTankPercentFilled; // %
 
 extern uint8_t gN2KSource;
