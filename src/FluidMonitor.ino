@@ -28,7 +28,7 @@ String gStatusSensor = "";
 uint16_t gTankHeight = 1000;
 uint16_t gTankfilled = 0;
 uint8_t gTankPercentFilled = 0;
-RingBuf<uint16_t, 30> myRingBuffer;
+RingBuf<uint16_t, 30> gAverageTankFilled;
 
 
 char Version[] = "0.0.0.1 (2023-07-25)"; // Manufacturer's Software version code
