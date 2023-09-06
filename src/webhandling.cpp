@@ -26,7 +26,7 @@
 #include "webhandling.h"
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "A1"
+#define CONFIG_VERSION "A5"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -43,7 +43,7 @@
 #endif
 
 // -- Initial name of the Thing. Used e.g. as SSID of the own Access Point.
-const char thingName[] = "NMEA-FluidMonitor";
+const char thingName[] = "NMEA2000-FluidLevel";
 
 // -- Method declarations.
 void handleRoot();
@@ -60,11 +60,12 @@ WebServer server(80);
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 
-IotWebConfParameterGroup sysConfGroup = IotWebConfParameterGroup("SysConf", "Tank");
+IotWebConfParameterGroup TankGroup = IotWebConfParameterGroup("TankGroup", "Tank");
+IotWebConfParameterGroup CalibrationGroup = IotWebConfParameterGroup("CalibrationGroup", "Sensor");
 
 iotwebconf::UIntTParameter<uint16_t> TankCapacity =
     iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("TankCapacity").
-    label("Capacity").
+    label("Capacity (l)").
     defaultValue(150).
     min(1u).
     step(1).
@@ -73,46 +74,58 @@ iotwebconf::UIntTParameter<uint16_t> TankCapacity =
 
 iotwebconf::UIntTParameter<uint16_t> TankHeight =
     iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("TankHeight").
-    label("Height").
-    defaultValue(150).
+    label("Height (mm)").
+    defaultValue(1000).
     min(1u).
     step(1).
-    placeholder("1..1000").
+    placeholder("1..2000").
     build();
 
-
-#define STRING_LEN 128
-
-static char FluidValues[][STRING_LEN] = {
-    "0",
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6"
-};
-static char FluidNames[][STRING_LEN] = { 
-    "Fuel", 
-    "Water", 
-    "Gray water", 
-    "Live well", 
-    "Oil", 
-    "Black water", 
-    "Gasoline fuel"
-};
-
-
 char FluidTypeValue[STRING_LEN];
-IotWebConfSelectParameter FluidType = IotWebConfSelectParameter("Fluid type",
-    "FluidType", 
-    FluidTypeValue, 
-    STRING_LEN, 
-    (char*)FluidValues, 
-    (char*)FluidNames, 
+IotWebConfSelectParameter FluidType = IotWebConfSelectParameter(
+    "Fluid type",
+    "FluidType",
+    FluidTypeValue,
+    STRING_LEN,
+    (char*)FluidValues,
+    (char*)FluidNames,
     sizeof(FluidValues) / STRING_LEN,
-    STRING_LEN);
+    STRING_LEN,
+    FluidNames[gFluidType]
+);
 
+char SensorCalibrationFactorValue[NUMBER_LEN];
+IotWebConfNumberParameter SensorCalibrationFactor = IotWebConfNumberParameter(
+    "Calibration factor", 
+    "CalibrationFactor", 
+    SensorCalibrationFactorValue, 
+    NUMBER_LEN, 
+    "1.0000", 
+    "e.g. 1.00001", 
+    "step='0.00001'"
+);
+
+char DeadzoneUpperValue[NUMBER_LEN];
+IotWebConfNumberParameter DeadzoneUpper = IotWebConfNumberParameter(
+    "Upper dead zone (mm)",
+    "UpperDeadZone",
+    DeadzoneUpperValue,
+    NUMBER_LEN,
+    "0",
+    "e.g. 1",
+    "step='1'"
+);
+
+char DeadzoneLowerValue[NUMBER_LEN];
+IotWebConfNumberParameter DeadzoneLower = IotWebConfNumberParameter(
+    "Lower dead zone (mm)",
+    "LowerDeadZone",
+    DeadzoneLowerValue,
+    NUMBER_LEN,
+    "0",
+    "e.g. 1",
+    "step='1'"
+);
 
 
 void wifiInit() {
@@ -120,15 +133,25 @@ void wifiInit() {
     Serial.println();
     Serial.println("starting up...");
 
+    DeadzoneLower.defaultValue = "0";
+    DeadzoneUpper.defaultValue = "0";
+    SensorCalibrationFactor.defaultValue = "1.00";
+
 
     iotWebConf.setStatusPin(STATUS_PIN, ON_LEVEL);
     iotWebConf.setConfigPin(CONFIG_PIN);
 
-    sysConfGroup.addItem(&TankCapacity);
-    sysConfGroup.addItem(&TankHeight);
-    sysConfGroup.addItem(&FluidType);
+    TankGroup.addItem(&FluidType);
+    TankGroup.addItem(&TankCapacity);
+    TankGroup.addItem(&TankHeight);
+    
 
-    iotWebConf.addParameterGroup(&sysConfGroup);
+    CalibrationGroup.addItem(&SensorCalibrationFactor);
+    CalibrationGroup.addItem(&DeadzoneUpper);
+    CalibrationGroup.addItem(&DeadzoneLower);
+
+    iotWebConf.addParameterGroup(&TankGroup);
+    iotWebConf.addParameterGroup(&CalibrationGroup);
 
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
@@ -166,32 +189,7 @@ void handleRoot() {
         return;
     }
 
-    String Type = "";
-    switch(gFluidType) {
-        case N2kft_Fuel:
-            Type = "Fuel";
-            break;
-        case N2kft_Water:
-            Type = "Water";
-            break;
-        case N2kft_GrayWater:
-            Type = "Gray water";
-            break;
-        case N2kft_LiveWell:
-            Type = "Live well";
-            break;
-        case N2kft_Oil:
-            Type = "Oil";
-            break;
-        case N2kft_BlackWater:
-            Type = "Black water";
-            break;
-        case N2kft_FuelGasoline:
-            Type = "Fule gasoline";
-            break;
-        default:
-            Type = "unknown";
-    }
+    String Type = FluidNames[gFluidType];
 
     String page = HTML_Start_Doc;
     
@@ -201,6 +199,10 @@ void handleRoot() {
     // page.replace("center", "left");
     page += ".dot-grey{height: 12px; width: 12px; background-color: #bbb; border-radius: 50%; display: inline-block; }";
     page += ".dot-green{height: 12px; width: 12px; background-color: green; border-radius: 50%; display: inline-block; }";
+    page += ".tank-lightgrey{color:#000; background-color:#f1f1f1}";
+    page += ".tank-green{color: #000; background-color:#ddffdd}";
+    page += ".tank-blue{color:#fff; background-color:#2196F3}";
+    page += ".round{border-radius:32px}";
 
     page += "</style>";
 
@@ -214,13 +216,13 @@ void handleRoot() {
     String Title = Type + " tank";
     page.replace("{l}", Title);
     page += HTML_Start_Table;
-        page += "<tr><td align=left>Filled: </td><td>";
-        page += "<progress id=tank style=height:50px max=100 value=" + String(gTankPercentFilled) + ">" + String(gTankPercentFilled) + "%</progress>";
+        page += "<tr><td align=left>Level: </td><td>";
+        page += "<progress id=tank style=height:50px max=100 value=" + String(gTankFilledPercent) + ">" + String(gTankFilledPercent) + "%</progress>";
         page += "</td></tr>";
 
-        page += "<tr><td align=left>Volume: </td><td>" + String(gFluidCapacity) + " l" + "</td></tr>";
+        page += "<tr><td align=left>Volume: </td><td>" + String(gTankCapacity) + " l" + "</td></tr>";
+        page += "<tr><td align=left>Filled: </td><td>" + String(gTankFilledPercent) + " %" + "</td></tr>";
         page += "<tr><td align=left>Sensor Status:</td><td>" + String(gStatusSensor) + "</td></tr>";
-
 
     page += HTML_End_Table;
     page += HTML_End_Fieldset;
@@ -231,6 +233,7 @@ void handleRoot() {
     page += HTML_Start_Table;
     page += "<tr><td align=left>Go to <a href = 'config'>configure page</a> to change configuration.</td></tr>";
     // page += "<tr><td align=left>Go to <a href='setruntime'>runtime modification page</a> to change runtime data.</td></tr>";
+    page += "<tr><td><font size=1>Version: " + String(Version) + "</font></td></tr>";
     page += HTML_End_Table;
     page += HTML_End_Body;
 
@@ -243,9 +246,12 @@ void handleRoot() {
 }
 
 void convertParams() {
-    gFluidCapacity = TankCapacity.value();
+    gTankCapacity = TankCapacity.value();
     gFluidType = tN2kFluidType(atoi(FluidTypeValue));
     gTankHeight = TankHeight.value();
+    gSensorCalibrationFactor = atof(SensorCalibrationFactorValue);
+    gDeadzoneUpper = atoi(DeadzoneUpperValue);
+    gDeadzoneLower = atoi(DeadzoneLowerValue);
 }
 
 void configSaved() {
