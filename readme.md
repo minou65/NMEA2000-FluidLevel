@@ -1,6 +1,6 @@
 # NEMA Fluidmonitor
 
-<img title="Title" src="../img/IMG_0270.png">
+<img title="Title" src="img/IMG_0270.png" width=600>
 
 - [NEMA Fluidmonitor](#nema-fluidmonitor)
   - [Description](#description)
