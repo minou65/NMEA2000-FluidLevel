@@ -1,35 +1,45 @@
 ﻿# Hardware
 - [Hardware](#hardware)
-  - [Required hardware](#required-hardware)
+  - [Schema](#schema)
   - [Sensor](#sensor)
-  - [CAN driver](#can-driver)
-  - [MCU](#mcu)
-  - [All asambled](#all-asambled)
+    - [case for the Sensor](#case-for-the-sensor)
+    - [installed Sensor](#installed-sensor)
+  - [ESP32](#esp32)
 
-## Required hardware
+## Schema
+
+The following [schema](/sch/NMEA2000-FluidLevel.pdf) show you, how to put all together.
 
 [top](#hardware)
 
 ## Sensor
+As sensor I used the VL53L0X. The VL53L0X is a Time-of-Flight (ToF) laser-ranging, providing accurate distance measurement whatever the target reflectances. It can measure absolute distances up to 2m.
 
-<img title="Test" src="../img/image002.jpg" width=400>
+### case for the Sensor
 
-<img title="Test" src="../img/image003.jpg" width=400>
+The STL file for printing the case is stored in the folder stl.
 
-<img title="Test" src="../img/image007.jpg" width=400>
+<img title="case sensor" src="../img/image002.jpg" width=400>
 
-<img title="Test" src="../img/image001.jpg" width=400>
+<img title="case sensor" src="../img/image003.jpg" width=400>
+
+Sensor mountet in the case
+
+<img title="case sensor" src="../img/image007.jpg" width=400>
+
+### installed Sensor
+
+I drilled a 10mm hole in the tank and then glued the housing on with Sika flex.
+
+<img title="System configuration" src="../img/image001.jpg" width=400>
 
 [top](#hardware)
 
-## CAN driver
+## ESP32
 
-[top](#hardware)
+<img title="System configuration" src="../img/image004.jpg" width=400>
 
-## MCU
+<img title="System configuration" src="../img/image005.jpg" width=400>
 
-[top](#hardware)
+<img title="System configuration" src="../img/image006.jpg" width=400>
 
-## All asambled
-
-[top](#hardware)

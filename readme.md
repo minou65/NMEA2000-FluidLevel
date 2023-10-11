@@ -8,6 +8,14 @@
   - [Librarys](#librarys)
   - [Hardware](#hardware)
   - [Configuration](#configuration)
+  - [Tank](#tank)
+    - [Fluid type](#fluid-type)
+    - [Capacity](#capacity)
+    - [Height](#height)
+  - [Sensor](#sensor)
+    - [Calibration factor](#calibration-factor)
+    - [Upper dead zone](#upper-dead-zone)
+    - [Lower dead zone](#lower-dead-zone)
   - [WiFi ](#wifi-)
     - [Default Password ](#default-password-)
     - [Default IP address ](#default-ip-address-)
@@ -17,28 +25,55 @@
     - [Reset ](#reset-)
 
 ## Description
+This sensor can be used to determine the fill level in a tank. The sensor VL53L0X is used for this and is a Time-of-Flight (TOF) laser-ranging module. It can measure absolute distances up to 2m, setting a new benchmark in ranging performance levels.
+
+A measurement is taken every second and the average value is calculated from 60 measurements.
 
 ## NMEA 2000
 
-The following PNG are send by this sensor
+The following PNG are send by this sensor. 
 
 - 127505
 
 ## Librarys
+- VL53L0X
+- prampec/IotWebConf
+- NMEA2000
+- NMEA200_ESP
 
 ## Hardware
 [Hardware description](/doc/hardware.md)
 
 ## Configuration
 
+## Tank
+<img title="System configuration" src="img/IMG_0273.jpeg" width=400>
+
+### Fluid type
+Select the fluid type.
+
+### Capacity
+The liters that can stored in the tank.
+
+### Height
+This is used to calculate the amount of liquid in the tank.
+
+## Sensor
+<img title="System configuration" src="img/IMG_0274.jpeg" width=400>
+
+### Calibration factor
+
+### Upper dead zone
+
+### Lower dead zone
+
 ## WiFi <a name="wifi"></a>
+<img title="System configuration" src="img/IMG_0272.jpeg" width=400>
 
 ### Default Password <a name="wifipassword"></a>
-
 When not connected to an AP the default password is 123456789
 
 ### Default IP address <a name="wifiipaddress"></a>
-
 When in AP mode, the default IP address is 192.168.4.1
 
 ### OTA <a name="wifiota"></a>
@@ -46,7 +81,6 @@ OTA is enabled, use default IP address or if connected to a AP the correct addre
 Port is the default port.
 
 ### Configuration options <a name="wificonfiguration"></a>
-
 After the first boot, there are some values needs to be set up.
 These items are maked with __*__ (star) in the list below.
 
@@ -70,7 +104,6 @@ to connect to. __*__
 unsecured passwords are not supported in your protection. __*__
 
 ### Blinking codes <a name="wifiblinkingcodes"></a>
-
 Prevoius chapters were mentioned blinking patterns, now here is a
 table summarize the menaning of the blink codes.
 
@@ -83,7 +116,6 @@ WiFi network.
 - __Mostly off with occasional short flash__ - The device is online.
 
 ### Reset <a name="wifireset"></a>
-
 When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 password to buld an AP. (E.g. in case of lost password)
 
