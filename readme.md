@@ -1,8 +1,8 @@
-# NEMA Fluidmonitor
+# NMEA 2000 Fluidmonitor
 
 <img title="Title" src="img/IMG_0270.jpeg" width=600>
 
-- [NEMA Fluidmonitor](#nema-fluidmonitor)
+- [NMEA 2000 Fluidmonitor](#nmea-2000-fluidmonitor)
   - [Description](#description)
   - [NMEA 2000](#nmea-2000)
   - [Librarys](#librarys)
