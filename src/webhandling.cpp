@@ -20,7 +20,6 @@
 #include <string.h>
 
 #include <IotWebConf.h>
-#include <IotWebConfUsing.h> // This loads aliases for easier class names.
 #include <IotWebConfTParameter.h>
 #include "common.h"
 #include "webhandling.h"
@@ -60,8 +59,8 @@ WebServer server(80);
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 
-IotWebConfParameterGroup TankGroup = IotWebConfParameterGroup("TankGroup", "Tank");
-IotWebConfParameterGroup CalibrationGroup = IotWebConfParameterGroup("CalibrationGroup", "Sensor");
+iotwebconf::ParameterGroup TankGroup = iotwebconf::ParameterGroup("TankGroup", "Tank");
+iotwebconf::ParameterGroup CalibrationGroup = iotwebconf::ParameterGroup("CalibrationGroup", "Sensor");
 
 iotwebconf::UIntTParameter<uint16_t> TankCapacity =
     iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("TankCapacity").
@@ -82,7 +81,7 @@ iotwebconf::UIntTParameter<uint16_t> TankHeight =
     build();
 
 char FluidTypeValue[STRING_LEN];
-IotWebConfSelectParameter FluidType = IotWebConfSelectParameter(
+iotwebconf::SelectParameter FluidType = iotwebconf::SelectParameter(
     "Fluid type",
     "FluidType",
     FluidTypeValue,
@@ -95,7 +94,7 @@ IotWebConfSelectParameter FluidType = IotWebConfSelectParameter(
 );
 
 char SensorCalibrationFactorValue[NUMBER_LEN];
-IotWebConfNumberParameter SensorCalibrationFactor = IotWebConfNumberParameter(
+iotwebconf::NumberParameter SensorCalibrationFactor = iotwebconf::NumberParameter(
     "Calibration factor", 
     "CalibrationFactor", 
     SensorCalibrationFactorValue, 
@@ -106,7 +105,7 @@ IotWebConfNumberParameter SensorCalibrationFactor = IotWebConfNumberParameter(
 );
 
 char DeadzoneUpperValue[NUMBER_LEN];
-IotWebConfNumberParameter DeadzoneUpper = IotWebConfNumberParameter(
+iotwebconf::NumberParameter DeadzoneUpper = iotwebconf::NumberParameter(
     "Upper dead zone (mm)",
     "UpperDeadZone",
     DeadzoneUpperValue,
@@ -117,7 +116,7 @@ IotWebConfNumberParameter DeadzoneUpper = IotWebConfNumberParameter(
 );
 
 char DeadzoneLowerValue[NUMBER_LEN];
-IotWebConfNumberParameter DeadzoneLower = IotWebConfNumberParameter(
+iotwebconf::NumberParameter DeadzoneLower = iotwebconf::NumberParameter(
     "Lower dead zone (mm)",
     "LowerDeadZone",
     DeadzoneLowerValue,
