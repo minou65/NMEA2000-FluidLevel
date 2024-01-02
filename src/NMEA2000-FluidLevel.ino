@@ -1,7 +1,7 @@
 // #define DEBUG_NMEA_MSG // Uncomment to see, what device will send to bus. Use e.g. OpenSkipper or Actisense NMEA Reader  
 // #define DEBUG_NMEA_MSG_ASCII // If you want to use simple ascii monitor like Arduino Serial Monitor, uncomment this line
 // #define DEBUG_NMEA_Actisense // Uncomment this, so you can test code without CAN bus chips on Arduino Mega
-#define DEBUG_MSG
+// #define DEBUG_MSG
 
 // use the following Pins
 
@@ -16,17 +16,15 @@
 #include "common.h"
 #include "webhandling.h"
 
-// Set time offsets
-#define SlowDataUpdatePeriod 2500  // Time between CAN Messages sent
-#define DistanceUpdatePeriod 1000  
-#define TempSendOffset 0
-
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
 
+tN2kSyncScheduler FluidLevelScheduler(false, 2500, 500);
+tN2kSyncScheduler MeasurementScheduler(true, 1000, 0);
+
 RingBuf<uint16_t, 30> gAverageTankFilled;
 
-char Version[] = "0.0.0.2 (2023-09-01)"; // Manufacturer's Software version code
+char Version[] = "0.0.0.3 (2023-09-01)"; // Manufacturer's Software version code
 
 uint16_t gTankCapacity = 150; // l
 uint16_t gTankHeight = 1000; // mm
@@ -59,6 +57,12 @@ const unsigned long TransmitMessages[] PROGMEM = {
     127505L,
     0
 };
+
+void OnN2kOpen() {
+    // Start schedulers now.
+    FluidLevelScheduler.UpdateNextTime();
+    MeasurementScheduler.UpdateNextTime();
+}
 
 void setup() {
     uint8_t chipid[6];
@@ -159,21 +163,9 @@ void setup() {
     // Here we tell library, which PGNs we transmit
     NMEA2000.ExtendTransmitMessages(TransmitMessages);
 
-
+    NMEA2000.SetOnOpen(OnN2kOpen);
     NMEA2000.Open();
 
-}
-
-bool IsTimeToUpdate(unsigned long NextUpdate) {
-    return (NextUpdate < millis());
-}
-
-unsigned long InitNextUpdate(unsigned long Period, unsigned long Offset = 0) {
-    return millis() + Period + Offset;
-}
-
-void SetNextUpdate(unsigned long& NextUpdate, unsigned long Period) {
-    while (NextUpdate < millis()) NextUpdate += Period;
 }
 
 uint16_t GetAverageDistance() {
@@ -193,11 +185,7 @@ uint16_t GetAverageDistance() {
 
 void GetDistance() {
 
-    static unsigned long DistanceUpdateTime = InitNextUpdate(DistanceUpdatePeriod, 0);
-
-    if (IsTimeToUpdate(DistanceUpdateTime)) {
-        SetNextUpdate(DistanceUpdateTime, DistanceUpdatePeriod);
-
+    if(MeasurementScheduler.IsTime()){
         uint32_t range = uint32_t(sensor.readRangeSingleMillimeters() * gSensorCalibrationFactor);
 
         if (!(sensor.timeoutOccurred())) {
@@ -238,7 +226,6 @@ void GetDistance() {
             Serial.println(F(""));
 #endif
 
-
         }
         else {
             gStatusSensor = "Timeout";
@@ -253,12 +240,9 @@ void GetDistance() {
 }
 
 void SendN2kFluidLevel(void) {
-
     tN2kMsg N2kMsg;
-    static unsigned long SlowDataUpdated = InitNextUpdate(SlowDataUpdatePeriod, TempSendOffset);
 
-    if (IsTimeToUpdate(SlowDataUpdated)) {
-        SetNextUpdate(SlowDataUpdated, SlowDataUpdatePeriod);
+    if (FluidLevelScheduler.IsTime()) {
         SetN2kFluidLevel(N2kMsg, 255, gFluidType, gTankFilledPercent, gTankCapacity);
         NMEA2000.SendMsg(N2kMsg);
     }
