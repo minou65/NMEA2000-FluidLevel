@@ -186,6 +186,8 @@ uint16_t GetAverageDistance() {
 void GetDistance() {
 
     if(MeasurementScheduler.IsTime()){
+        MeasurementScheduler.UpdateNextTime();
+
         uint32_t range = uint32_t(sensor.readRangeSingleMillimeters() * gSensorCalibrationFactor);
 
         if (!(sensor.timeoutOccurred())) {
@@ -243,6 +245,8 @@ void SendN2kFluidLevel(void) {
     tN2kMsg N2kMsg;
 
     if (FluidLevelScheduler.IsTime()) {
+        FluidLevelScheduler.UpdateNextTime();
+
         SetN2kFluidLevel(N2kMsg, 255, gFluidType, gTankFilledPercent, gTankCapacity);
         NMEA2000.SendMsg(N2kMsg);
     }
