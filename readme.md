@@ -2,27 +2,32 @@
 
 <img title="Title" src="img/IMG_0270.jpeg" width=600>
 
+## Table of contents
 - [NMEA 2000 Fluidmonitor](#nmea-2000-fluidmonitor)
+  - [Table of contents](#table-of-contents)
   - [Description](#description)
   - [NMEA 2000](#nmea-2000)
   - [Librarys](#librarys)
   - [Hardware](#hardware)
   - [Configuration](#configuration)
-  - [Tank](#tank)
-    - [Fluid type](#fluid-type)
-    - [Capacity](#capacity)
-    - [Height](#height)
-  - [Sensor](#sensor)
-    - [Calibration factor](#calibration-factor)
-    - [Upper dead zone](#upper-dead-zone)
-    - [Lower dead zone](#lower-dead-zone)
-  - [WiFi ](#wifi-)
-    - [Default Password ](#default-password-)
-    - [Default IP address ](#default-ip-address-)
-    - [OTA ](#ota-)
-    - [Configuration options ](#configuration-options-)
-    - [Blinking codes ](#blinking-codes-)
-    - [Reset ](#reset-)
+    - [NMEA 2000 Settings](#nmea-2000-settings)
+      - [Instance](#instance)
+      - [SID](#sid)
+    - [Tank](#tank)
+      - [Fluid type](#fluid-type)
+      - [Capacity](#capacity)
+      - [Height](#height)
+    - [Sensor](#sensor)
+      - [Calibration factor](#calibration-factor)
+      - [Upper dead zone](#upper-dead-zone)
+      - [Lower dead zone](#lower-dead-zone)
+  - [WiFi](#wifi)
+    - [Default Password](#default-password)
+    - [Default IP address](#default-ip-address)
+    - [OTA](#ota)
+    - [Configuration options](#configuration-options)
+  - [Blinking codes](#blinking-codes)
+  - [Reset](#reset)
 
 ## Description
 This sensor can be used to determine the fill level in a tank. The sensor VL53L0X is used for this and is a Time-of-Flight (TOF) laser-ranging module. It can measure absolute distances up to 2m, setting a new benchmark in ranging performance levels.
@@ -31,7 +36,7 @@ A measurement is taken every second and the average value is calculated from 60 
 
 ## NMEA 2000
 
-The following PNG are send by this sensor. 
+The following PNG is send by this sensor. 
 
 - 127505
 
@@ -45,42 +50,50 @@ The following PNG are send by this sensor.
 [Hardware description](/doc/hardware.md)
 
 ## Configuration
+### NMEA 2000 Settings
 
-## Tank
-<img title="System configuration" src="img/IMG_0273.jpeg" width=400>
+#### Instance
+This should be unique at least on one device. May be best to have it unique over all devices sending this PGN.
 
-### Fluid type
-Select the fluid type.
+#### SID
+Sequence identifier. In most cases you can use just 255 for SID. The sequence identifier field is used to tie different PGNs data together to same sampling or calculation time.
 
-### Capacity
-The liters that can stored in the tank.
+### Tank
+#### Fluid type
+Select the fluid type. can be one of the following
+- Fuel
+- Water
+- Gray water
+- Live well
+- Oil
+- Black water
+- Gasoline fuel
 
-### Height
-This is used to calculate the amount of liquid in the tank.
+#### Capacity
+The liters that can be stored in the tank.
 
-## Sensor
-<img title="System configuration" src="img/IMG_0274.jpeg" width=400>
+#### Height
+This value is used to calculate the amount of liquid in the tank.
 
-### Calibration factor
+### Sensor
+#### Calibration factor
 
-### Upper dead zone
+#### Upper dead zone
 
-### Lower dead zone
+#### Lower dead zone
 
-## WiFi <a name="wifi"></a>
-<img title="System configuration" src="img/IMG_0272.jpeg" width=400>
-
-### Default Password <a name="wifipassword"></a>
+## WiFi
+### Default Password
 When not connected to an AP the default password is 123456789
 
-### Default IP address <a name="wifiipaddress"></a>
+### Default IP address
 When in AP mode, the default IP address is 192.168.4.1
 
-### OTA <a name="wifiota"></a>
+### OTA
 OTA is enabled, use default IP address or if connected to a AP the correct address.
 Port is the default port.
 
-### Configuration options <a name="wificonfiguration"></a>
+### Configuration options
 After the first boot, there are some values needs to be set up.
 These items are maked with __*__ (star) in the list below.
 
@@ -103,7 +116,7 @@ to connect to. __*__
 - __WiFi password__ - The password of the network above. Note, that
 unsecured passwords are not supported in your protection. __*__
 
-### Blinking codes <a name="wifiblinkingcodes"></a>
+## Blinking codes
 Prevoius chapters were mentioned blinking patterns, now here is a
 table summarize the menaning of the blink codes.
 
@@ -115,7 +128,7 @@ network around it. You can connect to the device with your smartphone
 WiFi network.
 - __Mostly off with occasional short flash__ - The device is online.
 
-### Reset <a name="wifireset"></a>
+## Reset
 When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 password to buld an AP. (E.g. in case of lost password)
 
