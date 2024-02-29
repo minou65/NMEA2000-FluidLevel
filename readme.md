@@ -41,10 +41,10 @@ The following PNG is send by this sensor.
 - 127505
 
 ## Librarys
-- VL53L0X
+- [VL53L0X](https://github.com/pololu/vl53l0x-arduino)
 - prampec/IotWebConf
 - NMEA2000
-- NMEA200_ESP
+- NMEA2000_ESP
 
 ## Hardware
 [Hardware description](/doc/hardware.md)
