@@ -19,12 +19,14 @@
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
 
+bool gSaveParams = false;
+
 tN2kSyncScheduler FluidLevelScheduler(false, 2500, 500);
 tN2kSyncScheduler MeasurementScheduler(true, 1000, 0);
 
 RingBuf<uint16_t, 30> gAverageTankFilled;
 
-char Version[] = "0.0.0.3 (2023-09-01)"; // Manufacturer's Software version code
+char Version[] = "1.0.0.0 (2024-03-03)"; // Manufacturer's Software version code
 
 uint16_t gTankCapacity = 150; // l
 uint16_t gTankHeight = 1000; // mm
@@ -247,7 +249,7 @@ void SendN2kFluidLevel(void) {
     if (FluidLevelScheduler.IsTime()) {
         FluidLevelScheduler.UpdateNextTime();
 
-        SetN2kFluidLevel(N2kMsg, 255, gFluidType, gTankFilledPercent, gTankCapacity);
+        SetN2kFluidLevel(N2kMsg, Config.Instance(), gFluidType, gTankFilledPercent, gTankCapacity);
         NMEA2000.SendMsg(N2kMsg);
     }
 }
@@ -256,6 +258,11 @@ void loop() {
     SendN2kFluidLevel();
     NMEA2000.ParseMessages();
     wifiLoop();
+
+    if (NMEA2000.GetN2kSource() != gN2KSource) {
+        gN2KSource = NMEA2000.GetN2kSource();
+        gSaveParams = true;
+    }
 
     gParamsChanged = false;
 

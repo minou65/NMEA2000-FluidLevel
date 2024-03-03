@@ -59,6 +59,8 @@ WebServer server(80);
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 
+NMEAConfig Config = NMEAConfig();
+
 iotwebconf::ParameterGroup TankGroup = iotwebconf::ParameterGroup("TankGroup", "Tank");
 iotwebconf::ParameterGroup CalibrationGroup = iotwebconf::ParameterGroup("CalibrationGroup", "Sensor");
 
@@ -149,6 +151,7 @@ void wifiInit() {
     CalibrationGroup.addItem(&DeadzoneUpper);
     CalibrationGroup.addItem(&DeadzoneLower);
 
+    iotWebConf.addParameterGroup(&Config);
     iotWebConf.addParameterGroup(&TankGroup);
     iotWebConf.addParameterGroup(&CalibrationGroup);
 
@@ -174,6 +177,15 @@ void wifiLoop() {
     // -- doLoop should be called as frequently as possible.
     iotWebConf.doLoop();
     ArduinoOTA.handle();
+
+    if (gSaveParams) {
+        Serial.println(F("Parameters are changed,save them"));
+
+        Config.SetSource(gN2KSource);
+
+        iotWebConf.saveConfig();
+        gSaveParams = false;
+    }
 }
 
 void wifiConnected() {
@@ -262,6 +274,9 @@ void convertParams() {
     gSensorCalibrationFactor = atof(SensorCalibrationFactorValue);
     gDeadzoneUpper = atoi(DeadzoneUpperValue);
     gDeadzoneLower = atoi(DeadzoneLowerValue);
+
+    gN2KSource = Config.Source();
+
 }
 
 void configSaved() {

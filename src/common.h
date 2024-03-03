@@ -31,6 +31,7 @@ extern RingBuf<uint16_t, 30> gAverageTankFilled;
 
 
 extern uint8_t gN2KSource;
+extern bool gSaveParams;
 
 extern char Version[];
 
