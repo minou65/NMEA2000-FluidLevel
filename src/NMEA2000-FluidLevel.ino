@@ -26,7 +26,7 @@ tN2kSyncScheduler MeasurementScheduler(true, 1000, 0);
 
 RingBuf<uint16_t, 30> gAverageTankFilled;
 
-char Version[] = "1.0.0.0 (2024-03-03)"; // Manufacturer's Software version code
+char Version[] = "1.0.0.1 (2024-03-21)"; // Manufacturer's Software version code
 
 uint16_t gTankCapacity = 150; // l
 uint16_t gTankHeight = 1000; // mm

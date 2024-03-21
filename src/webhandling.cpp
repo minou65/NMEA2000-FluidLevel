@@ -21,6 +21,7 @@
 
 #include <IotWebConf.h>
 #include <IotWebConfTParameter.h>
+#include <IotWebConfESP32HTTPUpdateServer.h>
 #include "common.h"
 #include "webhandling.h"
 
@@ -56,6 +57,7 @@ bool gParamsChanged = true;
 
 DNSServer dnsServer;
 WebServer server(80);
+HTTPUpdateServer httpUpdater;
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 
@@ -154,6 +156,11 @@ void wifiInit() {
     iotWebConf.addParameterGroup(&Config);
     iotWebConf.addParameterGroup(&TankGroup);
     iotWebConf.addParameterGroup(&CalibrationGroup);
+
+    // -- Define how to handle updateServer calls.
+    iotWebConf.setupUpdateServer(
+        [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
+        [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
 
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
