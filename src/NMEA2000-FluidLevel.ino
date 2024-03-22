@@ -90,24 +90,26 @@ void setup() {
     Wire.begin();
 
     sensor.setTimeout(500);
-    if (!sensor.init()) {
-        Serial.println("Failed to detect and initialize sensor!");
-    }
-    else {
+    if (sensor.init()) {
         Serial.println("Detected and initialized sensor");
-    }
 
-    sensor.setTimeout(1000);
+        sensor.setTimeout(1000);
 
 #if defined LONG_RANGE
-    // lower the return signal rate limit (default is 0.25 MCPS)
-    sensor.setSignalRateLimit(0.1);
-    // increase laser pulse periods (defaults are 14 and 10 PCLKs)
-    sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
-    sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
+        // lower the return signal rate limit (default is 0.25 MCPS)
+        sensor.setSignalRateLimit(0.1);
+        // increase laser pulse periods (defaults are 14 and 10 PCLKs)
+        sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+        sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
 #endif
 
-    sensor.setMeasurementTimingBudget(HIGH_ACCURACY);
+        sensor.setMeasurementTimingBudget(HIGH_ACCURACY);
+    }
+    else {
+        Serial.println("Failed to detect and initialize sensor!");
+    }
+
+
 
     xTaskCreatePinnedToCore(
         loop2, /* Function to implement the task */
@@ -167,6 +169,8 @@ void setup() {
 
     NMEA2000.SetOnOpen(OnN2kOpen);
     NMEA2000.Open();
+
+    Serial.println("NMEA2000 started");
 
 }
 
