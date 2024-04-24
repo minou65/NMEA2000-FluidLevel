@@ -130,6 +130,16 @@ iotwebconf::NumberParameter DeadzoneLower = iotwebconf::NumberParameter(
     "step='1'"
 );
 
+class CustomHtmlFormatProvider : public iotwebconf::HtmlFormatProvider {
+protected:
+    virtual String getFormEnd() {
+        String _s = HtmlFormatProvider::getFormEnd();
+        _s += F("</br>Return to <a href='/'>home page</a>.");
+        return _s;
+    }
+};
+CustomHtmlFormatProvider customHtmlFormatProvider;
+
 
 void wifiInit() {
     Serial.begin(115200);
@@ -143,6 +153,7 @@ void wifiInit() {
 
     iotWebConf.setStatusPin(STATUS_PIN, ON_LEVEL);
     iotWebConf.setConfigPin(CONFIG_PIN);
+    iotWebConf.setHtmlFormatProvider(&customHtmlFormatProvider);
 
     TankGroup.addItem(&FluidType);
     TankGroup.addItem(&TankCapacity);
