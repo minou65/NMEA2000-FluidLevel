@@ -46,6 +46,7 @@
 const char thingName[] = "NMEA2000-FluidLevel";
 
 // -- Method declarations.
+void handleData();
 void handleRoot();
 void convertParams();
 
@@ -186,6 +187,7 @@ void wifiInit() {
     // -- Set up required URL handlers on the web server.
     server.on("/", handleRoot);
     server.on("/config", [] { iotWebConf.handleConfig(); });
+    server.on("/data", HTTP_GET, []() { handleData(); });
     server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
     Serial.println("Ready.");
@@ -208,6 +210,16 @@ void wifiLoop() {
 
 void wifiConnected() {
     ArduinoOTA.begin();
+}
+
+void handleData() {
+    String _response = "{";
+    _response += "\"capacity\":\"" + String(gTankCapacity) + "\",";
+    _response += "\"filledpercent\":\"" + String(gTankFilledPercent) + "\",";
+    //_response += "\"filledpercent\":\"" + String(random(0, 100)) +"\",";
+    _response += "\"status\":\"" + String(gStatusSensor) + "\"";
+    _response += "}";
+	server.send(200, "text/plain", _response);
 }
 
 void handleRoot() {
@@ -235,8 +247,8 @@ void handleRoot() {
 
     page += "</style>";
 
-    page += "<meta http-equiv=refresh content=30 />";
     page += HTML_Start_Body;
+    page += HTML_JAVA_Script
     page += "<table border=0 align=center>";
     page += "<tr><td>";
 
@@ -246,12 +258,13 @@ void handleRoot() {
     page.replace("{l}", Title);
     page += HTML_Start_Table;
         page += "<tr><td align=left>Level: </td><td>";
-        page += "<progress id=tank style=height:50px max=100 value=" + String(gTankFilledPercent) + ">" + String(gTankFilledPercent) + "%</progress>";
+        //page += "<progress id=tank style=height:50px max=100 value=" + String(gTankFilledPercent) + ">" + String(gTankFilledPercent) + "%</progress>";
+        page += "<progress id=tankValue style=height:50px max=100 value='0'>0%</progress>";
         page += "</td></tr>";
 
-        page += "<tr><td align=left>Volume: </td><td>" + String(gTankCapacity) + " l" + "</td></tr>";
-        page += "<tr><td align=left>Filled: </td><td>" + String(gTankFilledPercent) + " %" + "</td></tr>";
-        page += "<tr><td align=left>Sensor Status:</td><td>" + String(gStatusSensor) + "</td></tr>";
+        page += "<tr><td align=left>Volume: </td><td><span id='capacityValue'>0</span>l</td></tr>";
+        page += "<tr><td align=left>Filled: </td><td><span id='filledpercentValue'>0</span>%</td></tr>";
+        page += "<tr><td align=left>Sensor Status:</td><td><span id='statusValue'>no response</span></td></tr>";
 
     page += HTML_End_Table;
     page += HTML_End_Fieldset;

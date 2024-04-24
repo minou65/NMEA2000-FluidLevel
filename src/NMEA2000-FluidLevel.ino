@@ -16,6 +16,8 @@
 #include "common.h"
 #include "webhandling.h"
 
+char Version[] = "1.0.0.2 (2024-04-24)"; // Manufacturer's Software version code
+
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
 
@@ -25,8 +27,6 @@ tN2kSyncScheduler FluidLevelScheduler(false, 2500, 500);
 tN2kSyncScheduler MeasurementScheduler(true, 1000, 0);
 
 RingBuf<uint16_t, 30> gAverageTankFilled;
-
-char Version[] = "1.0.0.1 (2024-03-21)"; // Manufacturer's Software version code
 
 uint16_t gTankCapacity = 150; // l
 uint16_t gTankHeight = 1000; // mm

@@ -32,7 +32,36 @@
 #define HTML_End_Doc "</html>";
 #define HTML_Fieldset_Legend "<legend>{l}</legend>"
 #define HTML_Table_Row "<tr><td>{n}</td><td>{v}</td></tr>";
-
+#define HTML_JAVA_Script \
+"<script>\n \
+    // get intial data straight away \n \
+    requestData(); \n \
+\n \
+    // request data updates every milliseconds\n \
+    setInterval(requestData, 5000);\n \
+\n \
+    function requestData() {\n \
+		var xhttp = new XMLHttpRequest();\n \
+		xhttp.onreadystatechange = function() {\n \
+			if (this.readyState == 4 && this.status == 200) {\n \
+				var json = JSON.parse(this.responseText);\n \
+				updateData(json);\n \
+			}\n \
+		};\n \
+        xhttp.open('GET', 'data', true);\n \
+		xhttp.send();\n \
+	}\n \
+\n \
+    function updateData(jsonData) { \n \
+		const tankelement = document.getElementById('tankValue');\n \
+        tankelement.value = jsonData.filledpercent;\n \
+        tankelement.innerHTML = jsonData.filledpercent;\n \
+        document.getElementById('capacityValue').innerHTML = jsonData.capacity;\n \
+		document.getElementById('filledpercentValue').innerHTML = jsonData.filledpercent;\n \
+		document.getElementById('statusValue').innerHTML = jsonData.status;\n \
+	}\n \
+</script>\
+";
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
 const char wifiInitialApPassword[] = "123456789";
 
