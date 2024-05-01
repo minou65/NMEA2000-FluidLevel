@@ -16,7 +16,7 @@
 #include "common.h"
 #include "webhandling.h"
 
-char Version[] = "1.0.0.2 (2024-04-24)"; // Manufacturer's Software version code
+char Version[] = "1.0.0.3 (2024-04-28)"; // Manufacturer's Software version code
 
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
