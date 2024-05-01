@@ -24,13 +24,14 @@
 #include <IotWebConfESP32HTTPUpdateServer.h>
 #include "common.h"
 #include "webhandling.h"
+#include "IotWebRoot.h"
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "A5"
+#define CONFIG_VERSION "A6"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
-#define CONFIG_PIN  -1
+#define CONFIG_PIN  GPIO_NUM_13
 
 // -- Status indicator pin.
 //      First it will light up (kept LOW), on Wifi connection it will blink,
@@ -141,6 +142,26 @@ protected:
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
 
+class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {
+protected:
+    virtual String getScriptInner() {
+        String _s = HtmlRootFormatProvider::getScriptInner();
+        _s.replace("{millisecond}", "5000");
+        _s += F("function updateData(jsonData) {\n");
+        _s += F("   document.getElementById('RSSIValue').innerHTML = jsonData.rssi + \"dBm\" \n");
+
+        _s += F("   const tankelement = document.getElementById('tankValue'); \n");
+        _s += F("   tankelement.value = jsonData.filledpercent; \n");
+        _s += F("   tankelement.innerHTML = jsonData.filledpercent; \n");
+        _s += F("   document.getElementById('capacityValue').innerHTML = jsonData.capacity; \n");
+        _s += F("   document.getElementById('filledpercentValue').innerHTML = jsonData.filledpercent; \n");
+        _s += F("   document.getElementById('statusValue').innerHTML = jsonData.status; \n");
+        _s += F("}\n");
+
+        return _s;
+    }
+};
+
 
 void wifiInit() {
     Serial.begin(115200);
@@ -214,6 +235,7 @@ void wifiConnected() {
 
 void handleData() {
     String _response = "{";
+    _response += "\"rssi\":\"" + String(WiFi.RSSI()) + "\",";
     _response += "\"capacity\":\"" + String(gTankCapacity) + "\",";
     _response += "\"filledpercent\":\"" + String(gTankFilledPercent) + "\",";
     //_response += "\"filledpercent\":\"" + String(random(0, 100)) +"\",";
@@ -222,80 +244,59 @@ void handleData() {
 	server.send(200, "text/plain", _response);
 }
 
+
 void handleRoot() {
-    // -- Let IotWebConf test and handle captive portal requests.
-    if (iotWebConf.handleCaptivePortal())
-    {
-        // -- Captive portal request were already served.
+    if (iotWebConf.handleCaptivePortal()){
         return;
     }
 
-    String Type = FluidNames[gFluidType];
+    MyHtmlRootFormatProvider rootFormatProvider;
 
-    String page = HTML_Start_Doc;
-    
-    page.replace("{v}", iotWebConf.getThingName());
-    page += "<style>";
-    page += ".de{background-color:#ffaaaa;} .em{font-size:0.8em;color:#bb0000;padding-bottom:0px;} .c{text-align: center;} div,input,select{padding:5px;font-size:1em;} input{width:95%;} select{width:100%} input[type=checkbox]{width:auto;scale:1.5;margin:10px;} body{text-align: center;font-family:verdana;} button{border:0;border-radius:0.3rem;background-color:#16A1E7;color:#fff;line-height:2.4rem;font-size:1.2rem;width:100%;} fieldset{border-radius:0.3rem;margin: 0px;}";
-    // page.replace("center", "left");
-    page += ".dot-grey{height: 12px; width: 12px; background-color: #bbb; border-radius: 50%; display: inline-block; }";
-    page += ".dot-green{height: 12px; width: 12px; background-color: green; border-radius: 50%; display: inline-block; }";
-    page += ".tank-lightgrey{color:#000; background-color:#f1f1f1}";
-    page += ".tank-green{color: #000; background-color:#ddffdd}";
-    page += ".tank-blue{color:#fff; background-color:#2196F3}";
-    page += ".round{border-radius:32px}";
+    String _response = "";
+    _response += rootFormatProvider.getHtmlHead(iotWebConf.getThingName());
+    _response += rootFormatProvider.getHtmlStyle();
+    _response += rootFormatProvider.getHtmlHeadEnd();
+    _response += rootFormatProvider.getHtmlScript();
 
-    page += "</style>";
+    _response += rootFormatProvider.getHtmlTable();
+    _response += rootFormatProvider.getHtmlTableRow() + rootFormatProvider.getHtmlTableCol();
 
-    page += HTML_Start_Body;
-    page += HTML_JAVA_Script
-    page += "<table border=0 align=center>";
-    page += "<tr><td>";
+    _response += F("<fieldset align=left style=\"border: 1px solid\">\n");
+    _response += F("<table border=\"0\" align=\"center\" width=\"100%\">\n");
+    _response += F("<tr><td align=\"left\"> </td></td><td align=\"right\"><span id=\"RSSIValue\">no data</span></td></tr>\n");
+    _response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlFieldsetEnd();
 
-    page += HTML_Start_Fieldset;
-    page += HTML_Fieldset_Legend;
-    String Title = Type + " tank";
-    page.replace("{l}", Title);
-    page += HTML_Start_Table;
-        page += "<tr><td align=left>Level: </td><td>";
-        //page += "<progress id=tank style=height:50px max=100 value=" + String(gTankFilledPercent) + ">" + String(gTankFilledPercent) + "%</progress>";
-        page += "<progress id=tankValue style=height:50px max=100 value='0'>0%</progress>";
-        page += "</td></tr>";
+    _response += rootFormatProvider.getHtmlFieldset(String(FluidNames[gFluidType]) + " tank");
+    _response += rootFormatProvider.getHtmlTable();
+    _response += rootFormatProvider.getHtmlTableRow() + rootFormatProvider.getHtmlTableCol();
+    _response += F("<progress id=\"tankValue\" style=\"height:50px\" max=\"100\" value=\"0\">0%</progress>\n");
+    _response += rootFormatProvider.getHtmlTableColEnd() + rootFormatProvider.getHtmlTableRowEnd();
+    _response += F("<tr><td align=left>Volume: </td><td><span id='capacityValue'>0</span>l</td></tr>");
+    _response += F("<tr><td align=left>Filled: </td><td><span id='filledpercentValue'>0</span>%</td></tr>");
+    _response += F("<tr><td align=left>Sensor Status:</td><td><span id='statusValue'>no response</span></td></tr>");
+    _response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlFieldsetEnd();
 
-        page += "<tr><td align=left>Volume: </td><td><span id='capacityValue'>0</span>l</td></tr>";
-        page += "<tr><td align=left>Filled: </td><td><span id='filledpercentValue'>0</span>%</td></tr>";
-        page += "<tr><td align=left>Sensor Status:</td><td><span id='statusValue'>no response</span></td></tr>";
+    _response += rootFormatProvider.getHtmlFieldset("Network");
+    _response += rootFormatProvider.getHtmlTable();
+    _response += rootFormatProvider.getHtmlTableRowText("MAC Address:", WiFi.macAddress());
+    _response += rootFormatProvider.getHtmlTableRowText("IP Address:", WiFi.localIP().toString().c_str());
+    _response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlFieldsetEnd();
 
-    page += HTML_End_Table;
-    page += HTML_End_Fieldset;
+    _response += rootFormatProvider.addNewLine(2);
 
-    page += HTML_Start_Fieldset;
-    page += HTML_Fieldset_Legend;
-    page.replace("{l}", "Network");
-    page += HTML_Start_Table;
+    _response += rootFormatProvider.getHtmlTable();
+    _response += rootFormatProvider.getHtmlTableRowText("Go to <a href = 'config'>configure page</a> to change configuration.");
+    _response += rootFormatProvider.getHtmlTableRowText(rootFormatProvider.getHtmlVersion(Version));
+    _response += rootFormatProvider.getHtmlTableEnd();
 
-    page += "<tr><td align=left>MAC Address:</td><td>" + String(WiFi.macAddress()) + "</td></tr>";
-    page += "<tr><td align=left>IP Address:</td><td>" + String(WiFi.localIP().toString().c_str()) + "</td></tr>";
+    _response += rootFormatProvider.getHtmlTableColEnd() + rootFormatProvider.getHtmlTableRowEnd();
+    _response += rootFormatProvider.getHtmlTableEnd();
+    _response += rootFormatProvider.getHtmlEnd();
 
-    page += HTML_End_Table;
-    page += HTML_End_Fieldset;
-
-    page += "<br>";
-    page += "<br>";
-
-    page += HTML_Start_Table;
-    page += "<tr><td align=left>Go to <a href = 'config'>configure page</a> to change configuration.</td></tr>";
-    // page += "<tr><td align=left>Go to <a href='setruntime'>runtime modification page</a> to change runtime data.</td></tr>";
-    page += "<tr><td><font size=1>Version: " + String(Version) + "</font></td></tr>";
-    page += HTML_End_Table;
-    page += HTML_End_Body;
-
-    page += HTML_End_Doc;
-
-
-    server.send(200, "text/html", page);
-
-
+    server.send(200, "text/html", _response);
 }
 
 void convertParams() {
