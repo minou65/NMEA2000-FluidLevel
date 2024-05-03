@@ -30,9 +30,14 @@
   - [Reset](#reset)
 
 ## Description
+A sensor based on a VL53L0X to determine the fill level in a tank. The VL53L0X is a Time-of-Flight (TOF) laser-ranging module. It can measure absolute distances up to 2m
 This sensor can be used to determine the fill level in a tank. The sensor VL53L0X is used for this and is a Time-of-Flight (TOF) laser-ranging module. It can measure absolute distances up to 2m, setting a new benchmark in ranging performance levels.
 
-A measurement is taken every second and the average value is calculated from 60 measurements.
+A measurement is taken every second. The average value is determined from 60 measurements.
+
+ The system communicates via the NMEA 2000 protocol, sending temperature values and alarms as NMEA 2000 messages over an NMEA bus. Configuration is done through a web interface, and real-time values can be viewed on a website. Additionally, there's a link on the configuration page for convenient firmware updates.
+
+ <img src="img/IMG_0271.jpeg" width=500>
 
 ## NMEA 2000
 
@@ -132,4 +137,4 @@ WiFi network.
 When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 password to buld an AP. (E.g. in case of lost password)
 
-Reset pin is D3 / IO17
+Reset pin is GPIO 13
