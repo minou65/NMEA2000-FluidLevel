@@ -7,33 +7,24 @@
   - [ESP32](#esp32)
 
 ## Schema
-
-The following [schema](/sch/NMEA2000-FluidLevel.pdf) show you, how to put all together.
-
-[top](#hardware)
+<img src="../sch/schema.png" width="600" alt="schema">
 
 ## Sensor
 As sensor I used the VL53L0X. The VL53L0X is a Time-of-Flight (ToF) laser-ranging, providing accurate distance measurement whatever the target reflectances. It can measure absolute distances up to 2m.
 
-### case for the Sensor
+### Housing for the sensor
+The STL file for printing the housing is stored in the folder stl. The housing is filled with casting resin, so no lid is necessary.
 
-The STL file for printing the case is stored in the folder stl.
+<img src="../img/image002.jpg" width=400>
 
-<img title="case sensor" src="../img/image002.jpg" width=400>
+<img src="../img/image003.jpg" width=400>
 
-<img title="case sensor" src="../img/image003.jpg" width=400>
+<img src="../img/image007.jpg" width=400>
 
-Sensor mountet in the case
+### Mounting the Sensors
+I drilled a 10mm hole in the tank. Then fix the sensor in the drill hole with Sika flex.
 
-<img title="case sensor" src="../img/image007.jpg" width=400>
-
-### installed Sensor
-
-I drilled a 10mm hole in the tank and then glued the housing on with Sika flex.
-
-<img title="System configuration" src="../img/image001.jpg" width=400>
-
-[top](#hardware)
+<img src="../img/image001.jpg" width=400>
 
 ## ESP32
 
