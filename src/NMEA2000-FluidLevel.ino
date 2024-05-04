@@ -50,6 +50,7 @@ VL53L0X sensor;
 
 #define HIGH_SPEED 20000
 #define HIGH_ACCURACY 200000
+#define VERY_HIGH_ACCURACY 500000
 
 // Task handle (Core 0 on ESP32)
 TaskHandle_t TaskHandle;
@@ -95,21 +96,25 @@ void setup() {
 
         sensor.setTimeout(1000);
 
+		uint32_t TimingBudget = HIGH_ACCURACY;
+
 #if defined LONG_RANGE
         // lower the return signal rate limit (default is 0.25 MCPS)
         sensor.setSignalRateLimit(0.1);
         // increase laser pulse periods (defaults are 14 and 10 PCLKs)
         sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
         sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
-#endif
+#else
+        sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 12);
+        sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 8);
+		TimingBudget = VERY_HIGH_ACCURACY;
 
-        sensor.setMeasurementTimingBudget(HIGH_ACCURACY);
+#endif
+        sensor.setMeasurementTimingBudget(TimingBudget);
     }
     else {
         Serial.println("Failed to detect and initialize sensor!");
     }
-
-
 
     xTaskCreatePinnedToCore(
         loop2, /* Function to implement the task */
