@@ -15,6 +15,12 @@
 #include "N2kTypes.h"
 #include "RingBuf.h"
 
+extern bool debugMode;
+
+#define DEBUG_PRINT(x) if (debugMode) Serial.print(x) 
+#define DEBUG_PRINTLN(x) if (debugMode) Serial.println(x)
+#define DEBUG_PRINTF(...) if (debugMode) Serial.printf(__VA_ARGS__)
+
 extern tN2kFluidType gFluidType;
 
 extern String gStatusSensor;
