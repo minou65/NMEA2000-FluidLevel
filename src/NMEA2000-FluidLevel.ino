@@ -16,6 +16,8 @@
 #include "common.h"
 #include "webhandling.h"
 
+bool debugMode = false;
+
 char Version[] = "1.0.0.3 (2024-04-28)"; // Manufacturer's Software version code
 
 uint8_t gN2KSource = 22;
@@ -222,31 +224,21 @@ void GetDistance() {
                 gTankFilledPercent = 0;
             }
 
-#ifdef DEBUG_MSG
-            Serial.print(F("Height: "));
-            Serial.print(String(gTankHeight));
-            Serial.println(F("mm"));
-            Serial.print(F("Distance: "));
-            Serial.print(String(sensor.readRangeSingleMillimeters()));
-            Serial.println(F("mm"));
-            Serial.print(F("Filled: "));
-            Serial.print(String(gTankHeight - range));
-            Serial.print(F("mm ("));
-            Serial.print(gTankFilledPercent);
-            Serial.println(F("%)"));
-            Serial.print(F("calibration factor: "));
-            Serial.println(gSensorCalibrationFactor, 5);
-            Serial.println(F(""));
-#endif
+            char buffer[50];
+			sprintf(buffer, "Distance: %dmm. Calibration factor: %d", sensor.readRangeSingleMillimeters(), gSensorCalibrationFactor);
+			WebSerial.println(buffer);
+
+			DEBUG_PRINTF("Height: %dmm\n", gTankHeight);
+			DEBUG_PRINTF("Distance: %dmm\n", sensor.readRangeSingleMillimeters());
+			DEBUG_PRINTF("Filled: %dmm (%d%%)\n", gTankHeight - range, gTankFilledPercent);
+			DEBUG_PRINTF("calibration factor: %f\n", gSensorCalibrationFactor);
+			DEBUG_PRINTLN("");
 
         }
         else {
             gStatusSensor = "Timeout";
-
-#ifdef DEBUG_MSG
-            Serial.println(gStatusSensor);
-#endif // DEBUG_MSG
-
+			WebSerial.println(gStatusSensor);
+			DEBUG_PRINTLN(gStatusSensor);
         }
 
     }

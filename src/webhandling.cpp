@@ -26,7 +26,6 @@
 #include <IotWebConfAsyncClass.h>
 #include <IotWebConfAsyncUpdateServer.h>
 #include <IotWebRoot.h>
-#include <WebSerial.h>
 #include "favicon.h"
 #include <vector>
 
@@ -228,6 +227,8 @@ void wifiInit() {
         }
     );
 
+	WebSerial.begin(&server, "/webserial");
+
     Serial.println("Ready.");
 }
 
@@ -310,6 +311,7 @@ void handleRoot(AsyncWebServerRequest* request) {
 
     content_ += fp_.getHtmlTable().c_str();
     content_ += fp_.getHtmlTableRowText("Go to <a href = 'config'>configure page</a> to change configuration.").c_str();
+    content_ += fp_.getHtmlTableRowText("Go to <a href = 'webserial'>sensor monitoring</a> page.").c_str();
     content_ += fp_.getHtmlTableRowText(fp_.getHtmlVersion(Version)).c_str();
     content_ += fp_.getHtmlTableEnd().c_str();
 
@@ -318,25 +320,15 @@ void handleRoot(AsyncWebServerRequest* request) {
     content_ += fp_.getHtmlTableEnd().c_str();
     content_ += fp_.getHtmlEnd().c_str();
 
-    std::shared_ptr<uint16_t> pos_ = std::make_shared<uint16_t>(0);
-
-    AsyncWebServerResponse* response = request->beginChunkedResponse("text/html", [content_, pos_](uint8_t* buffer, size_t maxLen, size_t index) -> size_t {
+    AsyncWebServerResponse* response = request->beginChunkedResponse("text/html", [content_](uint8_t* buffer, size_t maxLen, size_t index) -> size_t {
 
         std::string chunk_ = "";
-        size_t len_ = min(content_.length() - *pos_, maxLen);
-        Serial.println("===============================================");
-        Serial.printf("content length: %i\n", content_.length());
-        Serial.printf("maxlen: %i\n", maxLen);
-        Serial.printf("pos: %i\n", *pos_);
-        Serial.printf("len: %i\n", len_);
-        Serial.printf("index: %i\n", index);
-
+        size_t len_ = min(content_.length() - index, maxLen);
         if (len_ > 0) {
-            chunk_ = content_.substr(*pos_, len_);
+            chunk_ = content_.substr(index, len_);
             chunk_.copy((char*)buffer, chunk_.length());
-            *pos_ += len_;
         }
-        if (*pos_ <= content_.length())
+        if (index + len_ <= content_.length())
             return chunk_.length();
         else
             return 0;
