@@ -18,7 +18,7 @@
 
 bool debugMode = false;
 
-char Version[] = "1.0.0.3 (2024-04-28)"; // Manufacturer's Software version code
+char Version[] = "1.1.0.1 (2024-05-13)"; // Manufacturer's Software version code
 
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
@@ -113,9 +113,11 @@ void setup() {
 
 #endif
         sensor.setMeasurementTimingBudget(TimingBudget);
+
     }
     else {
-        Serial.println("Failed to detect and initialize sensor!");
+        Serial.println(F("Failed to detect and initialize sensor!"));
+		gStatusSensor = "NOK";
     }
 
     xTaskCreatePinnedToCore(
@@ -197,6 +199,10 @@ uint16_t GetAverageDistance() {
 }
 
 void GetDistance() {
+	if (gStatusSensor == "NOK") {
+        WebSerial.println(F("Failed to detect and initialize sensor!"));
+		return;
+	}
 
     if(MeasurementScheduler.IsTime()){
         MeasurementScheduler.UpdateNextTime();
