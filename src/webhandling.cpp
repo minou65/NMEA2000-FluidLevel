@@ -26,8 +26,10 @@
 #include <IotWebConfAsyncClass.h>
 #include <IotWebConfAsyncUpdateServer.h>
 #include <IotWebRoot.h>
+#include <AsyncJson.h>
+#include <ArduinoJson.h>
 #include "favicon.h"
-#include <vector>
+
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
 #define CONFIG_VERSION "A6"
@@ -252,14 +254,15 @@ void wifiConnected() {
 }
 
 void handleData(AsyncWebServerRequest* request) {
-    String _response = "{";
-    _response += "\"rssi\":\"" + String(WiFi.RSSI()) + "\",";
-    _response += "\"capacity\":\"" + String(gTankCapacity) + "\",";
-    _response += "\"filledpercent\":\"" + String(gTankFilledPercent) + "\",";
-    //_response += "\"filledpercent\":\"" + String(random(0, 100)) +"\",";
-    _response += "\"status\":\"" + String(gStatusSensor) + "\"";
-    _response += "}";
-	request->send(200, "text/plain", _response);
+    AsyncJsonResponse* response = new AsyncJsonResponse();
+    response->addHeader("Server", "ESP Async Web Server");
+    JsonVariant& json_ = response->getRoot();
+	json_["rssi"] = WiFi.RSSI();
+	json_["capacity"] = gTankCapacity;
+	json_["filledpercent"] = gTankFilledPercent;
+	json_["status"] = gStatusSensor;
+	response->setLength();
+	request->send(response);
 }
 
 
