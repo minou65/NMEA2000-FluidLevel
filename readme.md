@@ -47,9 +47,12 @@ The following PNG is send by this sensor.
 
 ## Librarys
 - [VL53L0X](https://github.com/pololu/vl53l0x-arduino)
-- prampec/IotWebConf
 - NMEA2000
-- NMEA2000_ESP
+- NMEA200_ESP
+- [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
+- [IotWebConf](https://github.com/minou65/IotWebConf)
+- [IotWebConfAsync](https://github.com/minou65/IotWebConfAsync)
+- [IotWebRoot](https://github.com/minou65/IotWebRoot)
 
 ## Hardware
 [Hardware description](/doc/hardware.md)
