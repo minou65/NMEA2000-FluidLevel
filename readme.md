@@ -49,6 +49,7 @@ The following PNG is send by this sensor.
 - [VL53L0X](https://github.com/pololu/vl53l0x-arduino)
 - NMEA2000
 - NMEA200_ESP
+- [AsyncTCP](https://github.com/dvarrel/AsyncTCP)
 - [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
 - [IotWebConf](https://github.com/minou65/IotWebConf)
 - [IotWebConfAsync](https://github.com/minou65/IotWebConfAsync)
@@ -78,17 +79,29 @@ Select the fluid type. can be one of the following
 - Gasoline fuel
 
 #### Capacity
-The liters that can be stored in the tank.
+The volume in liters that can be held in the tank.
 
 #### Height
 This value is used to calculate the amount of liquid in the tank.
 
 ### Sensor
 #### Calibration factor
+You can calibrate this with a 2 point slope. Take one measurement at 50mm and another at 300mm. Write down the value that the sensor measures. Then calculate the factor according to the following formula
+
+```
+factor = (300mm - 50 mm) / ( X1 - X2)
+
+X1 = value for the 300mm measurement
+X2 = value for the 50mm measurement
+
+```
+Use the factor as your calibration factor. This 2 point slope should give you a good linear fit.
 
 #### Upper dead zone
+This value determines the dead zone at the top of the tank. If the reading is less than this value, then the tank is considered as full.
 
 #### Lower dead zone
+This value determines the dead zone at the bottom of the tank. If the measured value is greater than the tank height - lower dead zone, then the tank is considered as full.
 
 ## WiFi
 ### Default Password
