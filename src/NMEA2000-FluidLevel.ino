@@ -18,7 +18,7 @@
 
 bool debugMode = false;
 
-char Version[] = "1.1.0.2 (2024-05-18)"; // Manufacturer's Software version code
+char Version[] = "1.1.0.3 (2024-05-18)"; // Manufacturer's Software version code
 
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
@@ -53,9 +53,6 @@ VL53L0X sensor;
 #define HIGH_SPEED 20000
 #define HIGH_ACCURACY 200000
 #define VERY_HIGH_ACCURACY 500000
-
-// Task handle (Core 0 on ESP32)
-TaskHandle_t TaskHandle;
 
 // List here messages your device will transmit.
 const unsigned long TransmitMessages[] PROGMEM = {
@@ -119,16 +116,6 @@ void setup() {
         Serial.println(F("Failed to detect and initialize sensor!"));
 		gStatusSensor = "NOK";
     }
-
-    xTaskCreatePinnedToCore(
-        loop2, /* Function to implement the task */
-        "TaskHandle", /* Name of the task */
-        10000,  /* Stack size in words */
-        NULL,  /* Task input parameter */
-        0,  /* Priority of the task */
-        &TaskHandle,  /* Task handle. */
-        0 /* Core where the task should run */
-    );
 
     // Reserve enough buffer for sending all messages. This does not work on small memory devices like Uno or Mega
     NMEA2000.SetN2kCANMsgBufSize(8);
@@ -272,16 +259,10 @@ void loop() {
     }
 
     gParamsChanged = false;
+    GetDistance();
 
     // Dummy to empty input buffer to avoid board to stuck with e.g. NMEA Reader
     if (Serial.available()) {
         Serial.read();
-    }
-}
-
-void loop2(void* parameter) {
-    for (;;) {   // Endless loop
-        GetDistance();
-        vTaskDelay(100);
     }
 }

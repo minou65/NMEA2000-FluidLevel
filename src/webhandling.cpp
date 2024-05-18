@@ -12,15 +12,10 @@
 #include <ESP8266WiFi.h>      
 #endif
 
-#include <time.h>
-//needed for library
-
-#include <DNSServer.h>
-#include <iostream>
-#include <string.h>
-
 #include "common.h"
 #include "webhandling.h"
+#include "favicon.h"
+
 #include <DNSServer.h>
 #include <IotWebConfTParameter.h>
 #include <IotWebConfAsyncClass.h>
@@ -28,7 +23,7 @@
 #include <IotWebRoot.h>
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
-#include "favicon.h"
+
 
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
@@ -328,7 +323,7 @@ void handleRoot(AsyncWebServerRequest* request) {
         std::string chunk_ = "";
         size_t len_ = min(content_.length() - index, maxLen);
         if (len_ > 0) {
-            chunk_ = content_.substr(index, len_);
+            chunk_ = content_.substr(index, len_ - 1);
             chunk_.copy((char*)buffer, chunk_.length());
         }
         if (index + len_ <= content_.length())
