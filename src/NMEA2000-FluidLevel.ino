@@ -18,7 +18,7 @@
 
 bool debugMode = false;
 
-char Version[] = "1.1.0.1 (2024-05-13)"; // Manufacturer's Software version code
+char Version[] = "1.1.0.2 (2024-05-18)"; // Manufacturer's Software version code
 
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
@@ -199,13 +199,15 @@ uint16_t GetAverageDistance() {
 }
 
 void GetDistance() {
-	if (gStatusSensor == "NOK") {
-        WebSerial.println(F("Failed to detect and initialize sensor!"));
-		return;
-	}
 
     if(MeasurementScheduler.IsTime()){
         MeasurementScheduler.UpdateNextTime();
+
+        if (gStatusSensor == "NOK") {
+            WebSerial.println(F("Failed to detect and initialize sensor!"));
+            return;
+        }
+
 
         uint32_t range = uint32_t(sensor.readRangeSingleMillimeters() * gSensorCalibrationFactor);
 
