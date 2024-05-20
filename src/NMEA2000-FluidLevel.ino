@@ -219,7 +219,7 @@ void GetDistance() {
                 gTankFilledPercent = 0;
             }
 
-			WebSerial.printf("Distance: %dmm. Calibration factor: %d\n", sensor.readRangeSingleMillimeters(), gSensorCalibrationFactor);
+			WebSerial.printf("Distance: %dmm. Calibration factor: %f\n", sensor.readRangeSingleMillimeters(), gSensorCalibrationFactor);
 
 			DEBUG_PRINTF("Height: %dmm\n", gTankHeight);
 			DEBUG_PRINTF("Distance: %dmm\n", sensor.readRangeSingleMillimeters());
