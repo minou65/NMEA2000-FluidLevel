@@ -2,8 +2,8 @@
 - [Hardware](#hardware)
   - [Schema](#schema)
   - [Sensor](#sensor)
-    - [case for the Sensor](#case-for-the-sensor)
-    - [installed Sensor](#installed-sensor)
+    - [Housing for the sensor](#housing-for-the-sensor)
+    - [Mounting the Sensors](#mounting-the-sensors)
   - [ESP32](#esp32)
 
 ## Schema
@@ -21,10 +21,10 @@ The STL file for printing the housing is stored in the folder stl. The housing i
 
 <img src="../img/image007.jpg" width=400>
 
+<img src="../img/IMG_2790.jpg" width=400>
+
 ### Mounting the Sensors
 I drilled a 10mm hole in the tank. Then fix the sensor in the drill hole with Sika flex.
-
-<img src="../img/image001.jpg" width=400>
 
 ## ESP32
 
