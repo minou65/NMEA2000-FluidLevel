@@ -403,3 +403,4 @@ FodyWeavers.xsd
 *.heic
 .vscode/settings.json
 /src/NMEA2000-FluidLevel.ino.nodemcu-32s.bin
+/src/NMEA2000-FluidLevel.ino.nodemcu-32s.bin
