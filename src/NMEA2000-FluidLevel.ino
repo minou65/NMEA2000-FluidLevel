@@ -18,7 +18,7 @@
 
 bool debugMode = false;
 
-char Version[] = "1.1.0.3 (2024-05-18)"; // Manufacturer's Software version code
+char Version[] = "1.1.0.4 (2024-05-25)"; // Manufacturer's Software version code
 
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
@@ -171,18 +171,18 @@ void setup() {
 }
 
 uint16_t GetAverageDistance() {
-    uint16_t SumTankFilled = 0;
-    uint16_t Average = 0;
+    uint16_t _SumTankFilled = 0;
+    uint16_t _Average = 0;
 
     for (uint8_t j = 0; j < gAverageTankFilled.size(); j++) {
-        SumTankFilled += gAverageTankFilled[j];
+        _SumTankFilled += gAverageTankFilled[j];
     }
 
     if (gAverageTankFilled.size() > 0) {
-        Average = SumTankFilled / gAverageTankFilled.size();
+        _Average = _SumTankFilled / gAverageTankFilled.size();
     }
 
-    return Average;
+    return _Average;
 }
 
 void GetDistance() {
@@ -192,28 +192,29 @@ void GetDistance() {
 
         if (gStatusSensor == "NOK") {
             WebSerial.println(F("Failed to detect and initialize sensor!"));
+            WebSerial.printf("Calibration factor: %f\n", gSensorCalibrationFactor);
             return;
         }
 
 
-        uint32_t range = uint32_t(sensor.readRangeSingleMillimeters() * gSensorCalibrationFactor);
+        uint32_t _range = uint32_t(sensor.readRangeSingleMillimeters() * gSensorCalibrationFactor);
 
         if (!(sensor.timeoutOccurred())) {
             gStatusSensor = "Ok";
 
-            if (range < gDeadzoneUpper) {
-                range = 0;
+            if (_range < gDeadzoneUpper) {
+                _range = 0;
             }
 
-            if (range > gTankHeight - gDeadzoneLower) {
-                range = gTankHeight;
+            if (_range > gTankHeight - gDeadzoneLower) {
+                _range = gTankHeight;
             }
 
-            gAverageTankFilled.pushOverwrite(gTankHeight - range);
+            gAverageTankFilled.pushOverwrite(gTankHeight - _range);
 
-            uint16_t Tankfilled = GetAverageDistance();
-            if (Tankfilled != 0) {
-                gTankFilledPercent = 100 * Tankfilled / gTankHeight; // %
+            uint16_t _Tankfilled = GetAverageDistance();
+            if (_Tankfilled != 0) {
+                gTankFilledPercent = 100 * _Tankfilled / gTankHeight; // %
             }
             else {
                 gTankFilledPercent = 0;
@@ -223,14 +224,14 @@ void GetDistance() {
 
 			DEBUG_PRINTF("Height: %dmm\n", gTankHeight);
 			DEBUG_PRINTF("Distance: %dmm\n", sensor.readRangeSingleMillimeters());
-			DEBUG_PRINTF("Filled: %dmm (%d%%)\n", gTankHeight - range, gTankFilledPercent);
+			DEBUG_PRINTF("Filled: %dmm (%d%%)\n", gTankHeight - _range, gTankFilledPercent);
 			DEBUG_PRINTF("calibration factor: %f\n", gSensorCalibrationFactor);
 			DEBUG_PRINTLN("");
 
         }
         else {
             gStatusSensor = "Timeout";
-			WebSerial.println(gStatusSensor);
+			WebSerial.printf("Status Sensor %s; Calibration factor: %f\n", gStatusSensor, gSensorCalibrationFactor);
 			DEBUG_PRINTLN(gStatusSensor);
         }
 
