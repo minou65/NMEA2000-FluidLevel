@@ -15,10 +15,12 @@
 
 #include "common.h"
 #include "webhandling.h"
+#include "version.h"
 
 bool debugMode = false;
 
-char Version[] = "1.1.0.4 (2024-05-25)"; // Manufacturer's Software version code
+// Manufacturer's Software version code
+char Version[] = VERSION;
 
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
@@ -75,14 +77,12 @@ void setup() {
     esp_efuse_mac_get_default(chipid);
     for (i = 0; i < 6; i++) id += (chipid[i] << (7 * i));
 
-#ifdef DEBUG_MSG
     Serial.begin(115200);
-
-    // wait for serial port to open on native usb devices
     while (!Serial) {
         delay(1);
     }
-#endif // DEBUG_MSG
+
+    Serial.printf("Firmware version:%s\n", Version);
 
     // init wifi
     wifiInit();
