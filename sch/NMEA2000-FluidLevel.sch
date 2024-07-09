@@ -713,7 +713,7 @@ Es handelt sich hierbei um AK500 in horizontaler Ausführung.&lt;p&gt;
 </class>
 </classes>
 <parts>
-<part name="ESP1" library="_esp32" deviceset="ESP32-NODEMCU" device="" value="ESP32 NodeMCU"/>
+<part name="ESP1" library="_esp32" deviceset="ESP32-NODEMCU" device="" value="ESP32 CH340C Ultra Low Power Core Typ-C"/>
 <part name="IC1" library="v-reg" library_urn="urn:adsk.eagle:library:409" deviceset="78XXS" device="" package3d_urn="urn:adsk.eagle:package:30342/1" value="R-78E05-1.0"/>
 <part name="IC3" library="_eigene" deviceset="MCP2562" device=""/>
 <part name="FRAME1" library="frames" library_urn="urn:adsk.eagle:library:229" deviceset="DINA4_L" device=""/>
@@ -731,8 +731,10 @@ CANH = weiss
 <wire x1="71.12" y1="137.16" x2="71.12" y2="154.94" width="0.1524" layer="94"/>
 <wire x1="71.12" y1="154.94" x2="55.88" y2="154.94" width="0.1524" layer="94"/>
 <text x="55.88" y="134.62" size="1.778" layer="95">VL53L0X</text>
-<text x="93.98" y="147.32" size="1.778" layer="97">blue</text>
-<text x="93.98" y="144.78" size="1.778" layer="97">white</text>
+<text x="93.98" y="147.32" size="1.778" layer="97">green or blue</text>
+<text x="93.98" y="139.7" size="1.778" layer="97">white</text>
+<text x="93.98" y="142.24" size="1.778" layer="97">brown</text>
+<text x="93.98" y="144.78" size="1.778" layer="97">yellow or white</text>
 </plain>
 <instances>
 <instance part="ESP1" gate="G$1" x="180.34" y="114.3" smashed="yes">
@@ -744,8 +746,8 @@ CANH = weiss
 <attribute name="VALUE" x="81.28" y="83.82" size="1.778" layer="96"/>
 </instance>
 <instance part="IC3" gate="G$1" x="81.28" y="68.58" smashed="yes" rot="R180">
-<attribute name="NAME" x="91.44" y="40.64" size="1.778" layer="95" rot="R180"/>
-<attribute name="VALUE" x="91.44" y="43.18" size="1.778" layer="96" rot="R180"/>
+<attribute name="NAME" x="73.66" y="43.18" size="1.778" layer="95"/>
+<attribute name="VALUE" x="73.66" y="40.64" size="1.778" layer="96"/>
 </instance>
 <instance part="FRAME1" gate="G$1" x="0" y="0" smashed="yes"/>
 <instance part="FRAME1" gate="G$2" x="162.56" y="0" smashed="yes">
