@@ -8,6 +8,7 @@
 #define ESP32_CAN_TX_PIN GPIO_NUM_5  // Set CAN TX port to D5 
 #define ESP32_CAN_RX_PIN GPIO_NUM_4  // Set CAN RX port to D4
 
+#include <esp_task_wdt.h>
 #include <Wire.h>
 #include <VL53L0X.h>
 #include <N2kMessages.h>
@@ -16,11 +17,14 @@
 #include "common.h"
 #include "webhandling.h"
 #include "version.h"
+#include "neotimer.h"
 
 bool debugMode = false;
 
 // Manufacturer's Software version code
-char Version[] = VERSION;
+char Version[] = VERSION_STR;
+
+#define WDT_TIMEOUT 5
 
 uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
@@ -31,6 +35,7 @@ tN2kSyncScheduler FluidLevelScheduler(false, 2500, 500);
 tN2kSyncScheduler MeasurementScheduler(true, 1000, 0);
 
 RingBuf<uint16_t, 30> gAverageTankFilled;
+Neotimer WDtimer = Neotimer((WDT_TIMEOUT + 1) * 1000);
 
 uint16_t gTankCapacity = 150; // l
 uint16_t gTankHeight = 1000; // mm
@@ -168,6 +173,11 @@ void setup() {
 
     Serial.println("NMEA2000 started");
 
+    esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+    esp_task_wdt_add(NULL); //add current thread to WDT watch
+
+    WDtimer.start();
+
 }
 
 uint16_t GetAverageDistance() {
@@ -265,5 +275,9 @@ void loop() {
     // Dummy to empty input buffer to avoid board to stuck with e.g. NMEA Reader
     if (Serial.available()) {
         Serial.read();
+    }
+
+    if (WDtimer.repeat()) {
+        esp_task_wdt_reset();
     }
 }
