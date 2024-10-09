@@ -1,8 +1,5 @@
-// 
-// 
-// 
 
-#define DEBUG_WIFI(m) SERIAL_DBG.print(m)
+//#define DEBUG_WIFI(m) SERIAL_DBG.print(m)
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
@@ -15,6 +12,7 @@
 #include "common.h"
 #include "webhandling.h"
 #include "favicon.h"
+#include "neotimer.h"
 
 #include <DNSServer.h>
 #include <IotWebConfTParameter.h>
@@ -23,7 +21,7 @@
 #include <IotWebRoot.h>
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
-#define CONFIG_VERSION "A6"
+#define CONFIG_VERSION "A7"
 
 // -- When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //      password to buld an AP. (E.g. in case of lost password)
@@ -42,6 +40,9 @@
 // -- Initial name of the Thing. Used e.g. as SSID of the own Access Point.
 const char thingName[] = "NMEA2000-FluidLevel";
 
+uint8_t APModeOfflineTime = 0;
+Neotimer APModeTimer = Neotimer();
+
 // -- Method declarations.
 void handleData(AsyncWebServerRequest* request);
 void handleRoot(AsyncWebServerRequest* request);
@@ -59,6 +60,9 @@ AsyncWebServerWrapper asyncWebServerWrapper(&server);
 AsyncUpdateServer AsyncUpdater;
 
 IotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
+
+char APModeOfflineValue[STRING_LEN];
+iotwebconf::NumberParameter APModeOfflineParam = iotwebconf::NumberParameter("AP offline mode after (minutes)", "APModeOffline", APModeOfflineValue, NUMBER_LEN, "0", "0..30", "min='0' max='30', step='1'");
 
 NMEAConfig Config = NMEAConfig();
 
@@ -187,6 +191,8 @@ void wifiInit() {
     iotWebConf.addParameterGroup(&TankGroup);
     iotWebConf.addParameterGroup(&CalibrationGroup);
 
+    iotWebConf.addSystemParameter(&APModeOfflineParam);
+
     iotWebConf.setupUpdateServer(
         [](const char* updatePath) { AsyncUpdater.setup(&server, updatePath); },
         [](const char* userName, char* password) { AsyncUpdater.updateCredentials(userName, password); });
@@ -222,6 +228,10 @@ void wifiInit() {
 
 	WebSerial.begin(&server, "/webserial");
 
+    if (APModeOfflineTime > 0) {
+        APModeTimer.start(APModeOfflineTime * 60 * 1000);
+    }
+
     Serial.println("Ready.");
 }
 
@@ -237,6 +247,12 @@ void wifiLoop() {
 
         iotWebConf.saveConfig();
         gSaveParams = false;
+    }
+
+    if (APModeTimer.done()) {
+        Serial.println(F("AP mode offline time reached"));
+        iotWebConf.goOffLine();
+        APModeTimer.stop();
     }
 }
 
@@ -340,6 +356,8 @@ void convertParams() {
     gDeadzoneLower = atoi(DeadzoneLowerValue);
 
     gN2KSource = Config.Source();
+
+    APModeOfflineTime = atoi(APModeOfflineValue);
 
 }
 
