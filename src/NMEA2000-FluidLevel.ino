@@ -191,14 +191,23 @@ uint16_t GetAverageDistance() {
     return _Average;
 }
 
+String getCurrentTime() {
+    time_t now_ = time(nullptr);
+    struct tm* timeInfo_ = localtime(&now_);
+
+    char buffer_[9]; // Puffer für "H:m:s"
+    strftime(buffer_, sizeof(buffer_), "%H:%M:%S", timeInfo_);
+
+    return String(buffer_);
+}
+
 void GetDistance() {
 
     if(MeasurementScheduler.IsTime()){
         MeasurementScheduler.UpdateNextTime();
 
         if (gStatusSensor == "NOK") {
-            WebSerial.println(F("Failed to detect and initialize sensor!"));
-            WebSerial.printf("Calibration factor: %f\n", gSensorCalibrationFactor);
+            WebSerial.printf("%s : Failed to detect and initialize sensor!\n", getCurrentTime());
             return;
         }
 
@@ -226,7 +235,7 @@ void GetDistance() {
                 gTankFilledPercent = 0;
             }
 
-			WebSerial.printf("Distance: %dmm. Calibration factor: %f\n", sensor.readRangeSingleMillimeters(), gSensorCalibrationFactor);
+			WebSerial.printf("%s : Distance: %dmm. Calibration factor: %f\n", getCurrentTime(), sensor.readRangeSingleMillimeters(), gSensorCalibrationFactor);
 
 			DEBUG_PRINTF("Height: %dmm\n", gTankHeight);
 			DEBUG_PRINTF("Distance: %dmm\n", sensor.readRangeSingleMillimeters());
@@ -237,7 +246,7 @@ void GetDistance() {
         }
         else {
             gStatusSensor = "Timeout";
-			WebSerial.printf("Status Sensor %s; Calibration factor: %f\n", gStatusSensor, gSensorCalibrationFactor);
+			WebSerial.printf("%s : Status Sensor %s; Calibration factor: %f\n", getCurrentTime(), gStatusSensor, gSensorCalibrationFactor);
 			DEBUG_PRINTLN(gStatusSensor);
         }
 
