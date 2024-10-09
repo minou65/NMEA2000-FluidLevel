@@ -35,7 +35,6 @@ tN2kSyncScheduler FluidLevelScheduler(false, 2500, 500);
 tN2kSyncScheduler MeasurementScheduler(true, 1000, 0);
 
 RingBuf<uint16_t, 30> gAverageTankFilled;
-Neotimer WDtimer = Neotimer((WDT_TIMEOUT + 1) * 1000);
 
 uint16_t gTankCapacity = 150; // l
 uint16_t gTankHeight = 1000; // mm
@@ -175,9 +174,6 @@ void setup() {
 
     esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
     esp_task_wdt_add(NULL); //add current thread to WDT watch
-
-    WDtimer.start();
-
 }
 
 uint16_t GetAverageDistance() {
@@ -260,6 +256,8 @@ void SendN2kFluidLevel(void) {
 }
 
 void loop() {
+    esp_task_wdt_reset();
+
     SendN2kFluidLevel();
     NMEA2000.ParseMessages();
     wifiLoop();
@@ -275,9 +273,5 @@ void loop() {
     // Dummy to empty input buffer to avoid board to stuck with e.g. NMEA Reader
     if (Serial.available()) {
         Serial.read();
-    }
-
-    if (WDtimer.repeat()) {
-        esp_task_wdt_reset();
     }
 }
