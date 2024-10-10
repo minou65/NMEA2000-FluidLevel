@@ -10,6 +10,12 @@
   - [Librarys](#librarys)
   - [Hardware](#hardware)
   - [Configuration](#configuration)
+    - [System Configuration](#system-configuration)
+      - [Thing name](#thing-name)
+      - [AP password](#ap-password)
+      - [WiFi SSID](#wifi-ssid)
+      - [WiFi password](#wifi-password)
+      - [AP offline mode after (minutes)](#ap-offline-mode-after-minutes)
     - [NMEA 2000 Settings](#nmea-2000-settings)
       - [Instance](#instance)
       - [SID](#sid)
@@ -21,11 +27,9 @@
       - [Calibration factor](#calibration-factor)
       - [Upper dead zone](#upper-dead-zone)
       - [Lower dead zone](#lower-dead-zone)
-  - [WiFi](#wifi)
-    - [Default Password](#default-password)
-    - [Default IP address](#default-ip-address)
-    - [OTA](#ota)
-    - [Configuration options](#configuration-options)
+  - [Default password](#default-password)
+  - [Default IP address](#default-ip-address)
+  - [Firmware Update](#firmware-update)
   - [Blinking codes](#blinking-codes)
   - [Reset](#reset)
 
@@ -47,22 +51,45 @@ The following PNG is send by this sensor.
 
 ## Librarys
 - [VL53L0X](https://github.com/pololu/vl53l0x-arduino)
-- NMEA2000
-- NMEA200_ESP
-- [AsyncTCP](https://github.com/dvarrel/AsyncTCP)
-- [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
+- [NMEA2000](https://github.com/ttlappalainen/NMEA2000)
+- [NMEA200_ESP32](https://github.com/ttlappalainen/NMEA2000_esp32)
+- [AsyncTCP (3.2.6) __"__](https://github.com/mathieucarbou/AsyncTCP)
+- [ESPAsyncWebServer (3.3.12) __*__](https://github.com/mathieucarbou/ESPAsyncWebServer)
+- [Webserial (2.0.7) __*__](https://github.com/ayushsharma82/WebSerial)
 - [IotWebConf](https://github.com/minou65/IotWebConf)
-- [IotWebConfAsync](https://github.com/minou65/IotWebConfAsync)
+- [IotWebConfAsync (1.0.2) __*__](https://github.com/minou65/IotWebConfAsync)
 - [IotWebRoot](https://github.com/minou65/IotWebRoot)
+
+__*__ new version and/or new repo
 
 ## Hardware
 [Hardware description](/doc/hardware.md)
 
 ## Configuration
+After the first boot, there are some values needs to be set up.
+These items are maked with __*__ (star) in the list below.
+
+### System Configuration
+
+#### Thing name
+Please change the name of the device to a name you think describes it the most. It is advised to incorporate a location here in case you are planning to set up multiple devices in the same area. You should only use english letters, and the "_" underscore character. Thus, must not use Space, dots, etc. E.g. `fresh_water` __*__
+
+#### AP password
+This password is used, when you want to access the device later on. You must provide a password with at least 8, at most 32 characters. You are free to use any characters, further more you are encouraged to pick a password at least 12 characters long containing at least 3 character classes. __*__
+
+#### WiFi SSID
+The name of the WiFi network you want the device to connect to. __*__
+
+#### WiFi password
+The password of the network above. Note, that unsecured passwords are not supported in your protection. __*__
+
+#### AP offline mode after (minutes)
+If you don’t plan to connect the sensor to a WiFi network, you don’t need to configure the two options above. If you want to disable the WiFi after a certain time, you can use this option. Specify how long the WiFi should remain enabled after turning on the sensor. Valid values are from 0 to 30 minutes. A value of 0 means that WiFi is always enabled.
+
 ### NMEA 2000 Settings
 
 #### Instance
-This should be unique at least on one device. May be best to have it unique over all devices sending this PGN.
+This should be unique at least on one device. May be best to have it unique over all devices sending this PGN. __*__
 
 #### SID
 Sequence identifier. In most cases you can use just 255 for SID. The sequence identifier field is used to tie different PGNs data together to same sampling or calculation time.
@@ -79,10 +106,10 @@ Select the fluid type. can be one of the following
 - Gasoline fuel
 
 #### Capacity
-The volume in liters that can be held in the tank.
+The volume in liters that can be held in the tank. __*__
 
 #### Height
-This value is used to calculate the amount of liquid in the tank.
+This value is used to calculate the amount of liquid in the tank. __*__
 
 ### Sensor
 #### Calibration factor
@@ -103,51 +130,24 @@ This value determines the dead zone at the top of the tank. If the reading is le
 #### Lower dead zone
 This value determines the dead zone at the bottom of the tank. If the measured value is greater than the tank height - lower dead zone, then the tank is considered as full.
 
-## WiFi
-### Default Password
+## Default password
 When not connected to an AP the default password is 123456789
 
-### Default IP address
+## Default IP address
 When in AP mode, the default IP address is 192.168.4.1
 
-### OTA
-OTA is enabled, use default IP address or if connected to a AP the correct address.
-Port is the default port.
-
-### Configuration options
-After the first boot, there are some values needs to be set up.
-These items are maked with __*__ (star) in the list below.
-
-You can set up the following values in the configuration page:
-
--  __Thing name__ - Please change the name of the device to
-a name you think describes it the most. It is advised to
-incorporate a location here in case you are planning to
-set up multiple devices in the same area. You should only use
-english letters, and the "_" underscore character. Thus, must not
-use Space, dots, etc. E.g. `lamp_livingroom` __*__
-- __AP password__ - This password is used, when you want to
-access the device later on. You must provide a password with at least 8,
-at most 32 characters.
-You are free to use any characters, further more you are
-encouraged to pick a password at least 12 characters long containing
-at least 3 character classes. __*__
-- __WiFi SSID__ - The name of the WiFi network you want the device
-to connect to. __*__
-- __WiFi password__ - The password of the network above. Note, that
-unsecured passwords are not supported in your protection. __*__
+## Firmware Update
+To update the firmware, navigate to the Configuration page and click on the Firmware Update link. Follow the on-screen instructions to complete the update process.
 
 ## Blinking codes
-Prevoius chapters were mentioned blinking patterns, now here is a
-table summarize the menaning of the blink codes.
+Prevoius chapters were mentioned blinking patterns, now here is a table summarize the menaning of the blink codes.
 
-- __Rapid blinking__ (mostly on, interrupted by short off periods) -
-Entered Access Point mode. This means the device create an own WiFi
-network around it. You can connect to the device with your smartphone
-(or WiFi capable computer).
-- __Alternating on/off blinking__ - Trying to connect the configured
-WiFi network.
-- __Mostly off with occasional short flash__ - The device is online.
+| Blinking Pattern | Meaning |
+| --- | --- |
+| Rapid blinking <\br>(mostly on, interrupted by short off periods) | Entered Access Point mode. This means the device creates its own WiFi network. You can connect to the device with your smartphone or WiFi capable computer. |
+| Alternating on/off blinking | Trying to connect to the configured WiFi network. |
+| Mostly off with occasional short flash | The device is online. |
+| Mostly off with occasional long flash | The device is in offline mode |
 
 ## Reset
 When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
