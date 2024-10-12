@@ -254,6 +254,12 @@ void wifiLoop() {
         iotWebConf.goOffLine();
         APModeTimer.stop();
     }
+
+    if (AsyncUpdater.isFinished()) {
+        Serial.println(F("Firmware update finished"));
+        delay(1000);
+        ESP.restart();
+    }
 }
 
 void wifiConnected() {
