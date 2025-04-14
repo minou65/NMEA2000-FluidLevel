@@ -3,10 +3,13 @@
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
-#if ESP32
+#if defined(ESP32)
 #include <WiFi.h>
+// #include <esp_wifi.h>
+#elif defined(ESP8266)
+#include <ESP8266WiFi.h>
 #else
-#include <ESP8266WiFi.h>      
+#error "Unsupported platform"
 #endif
 
 #include "common.h"
@@ -15,7 +18,7 @@
 #include "neotimer.h"
 
 #include <DNSServer.h>
-#include <IotWebConfTParameter.h>
+#include <IotWebConf.h>
 #include <IotWebConfAsyncClass.h>
 #include <IotWebConfAsyncUpdateServer.h>
 #include <IotWebRoot.h>
@@ -69,69 +72,19 @@ NMEAConfig Config = NMEAConfig();
 iotwebconf::ParameterGroup TankGroup = iotwebconf::ParameterGroup("TankGroup", "Tank");
 iotwebconf::ParameterGroup CalibrationGroup = iotwebconf::ParameterGroup("CalibrationGroup", "Sensor");
 
-iotwebconf::UIntTParameter<uint16_t> TankCapacity =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("TankCapacity").
-    label("Capacity (l)").
-    defaultValue(150).
-    min(1u).
-    step(1).
-    placeholder("1..1000").
-    build();
-
-iotwebconf::UIntTParameter<uint16_t> TankHeight =
-    iotwebconf::Builder<iotwebconf::UIntTParameter<uint16_t>>("TankHeight").
-    label("Height (mm)").
-    defaultValue(1000).
-    min(1u).
-    step(1).
-    placeholder("1..2000").
-    build();
-
 char FluidTypeValue[STRING_LEN];
-iotwebconf::SelectParameter FluidType = iotwebconf::SelectParameter(
-    "Fluid type",
-    "FluidType",
-    FluidTypeValue,
-    STRING_LEN,
-    (char*)FluidValues,
-    (char*)FluidNames,
-    sizeof(FluidValues) / STRING_LEN,
-    STRING_LEN,
-    FluidNames[gFluidType]
-);
-
+char TankCapacityValue[NUMBER_LEN];
+char TankHeightValue[NUMBER_LEN];
 char SensorCalibrationFactorValue[NUMBER_LEN];
-iotwebconf::NumberParameter SensorCalibrationFactor = iotwebconf::NumberParameter(
-    "Calibration factor", 
-    "CalibrationFactor", 
-    SensorCalibrationFactorValue, 
-    NUMBER_LEN, 
-    "1.0000", 
-    "e.g. 1.00001", 
-    "step='0.00001'"
-);
-
 char DeadzoneUpperValue[NUMBER_LEN];
-iotwebconf::NumberParameter DeadzoneUpper = iotwebconf::NumberParameter(
-    "Upper dead zone (mm)",
-    "UpperDeadZone",
-    DeadzoneUpperValue,
-    NUMBER_LEN,
-    "0",
-    "e.g. 1",
-    "step='1'"
-);
-
 char DeadzoneLowerValue[NUMBER_LEN];
-iotwebconf::NumberParameter DeadzoneLower = iotwebconf::NumberParameter(
-    "Lower dead zone (mm)",
-    "LowerDeadZone",
-    DeadzoneLowerValue,
-    NUMBER_LEN,
-    "0",
-    "e.g. 1",
-    "step='1'"
-);
+
+iotwebconf::NumberParameter TankCapacity = iotwebconf::NumberParameter("Capacity(l)", "TankCapacity", TankCapacityValue, NUMBER_LEN, "150", "1..1000", "min = '1' max = '1000' step = '1'");
+iotwebconf::NumberParameter TankHeight = iotwebconf::NumberParameter("Height(mm)", "TankHeight", TankHeightValue, NUMBER_LEN, "1000", "1..2000", "min = '1' max = '2000' step = '1'");
+iotwebconf::SelectParameter FluidType = iotwebconf::SelectParameter("Fluid type", "FluidType", FluidTypeValue, STRING_LEN, (char*)FluidValues, (char*)(FluidNames), sizeof(FluidValues) / STRING_LEN, STRING_LEN, FluidNames[gFluidType]);
+iotwebconf::NumberParameter SensorCalibrationFactor = iotwebconf::NumberParameter("Calibration factor", "CalibrationFactor", SensorCalibrationFactorValue, NUMBER_LEN, "1.0000", "e.g. 1.00001", "step='0.00001'");
+iotwebconf::NumberParameter DeadzoneUpper = iotwebconf::NumberParameter("Upper dead zone (mm)", "UpperDeadZone", DeadzoneUpperValue, NUMBER_LEN, "0", "e.g. 1", "step='1'");
+iotwebconf::NumberParameter DeadzoneLower = iotwebconf::NumberParameter("Lower dead zone (mm)", "LowerDeadZone", DeadzoneLowerValue, NUMBER_LEN, "0", "e.g. 1", "step='1'");
 
 class CustomHtmlFormatProvider : public iotwebconf::HtmlFormatProvider {
 protected:
@@ -354,9 +307,9 @@ void handleRoot(AsyncWebServerRequest* request) {
 }
 
 void convertParams() {
-    gTankCapacity = TankCapacity.value();
+    gTankCapacity = atoi(TankCapacityValue);
     gFluidType = tN2kFluidType(atoi(FluidTypeValue));
-    gTankHeight = TankHeight.value();
+    gTankHeight = atoi(TankHeightValue);
     gSensorCalibrationFactor = atof(SensorCalibrationFactorValue);
     gDeadzoneUpper = atoi(DeadzoneUpperValue);
     gDeadzoneLower = atoi(DeadzoneLowerValue);

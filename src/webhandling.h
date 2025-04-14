@@ -9,12 +9,6 @@
 #include "WProgram.h"
 #endif
 
-#if ESP32
-#include <WiFi.h>
-#else
-#include <ESP8266WiFi.h>      
-#endif
-
 #include <IotWebConf.h>
 #include <WebSerial.h>
 
