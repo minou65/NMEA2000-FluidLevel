@@ -51,10 +51,10 @@ uint8_t gDeadzoneLower = 0; //mm
 String gStatusSensor = "";
 
 
-VL53L0X sensor;
+VL53L0X vl53l0x;
 
 // Uncomment this line to use long range mode. This
-// increases the sensitivity of the sensor and extends its
+// increases the sensitivity of the vl53l0x and extends its
 // potential range, but increases the likelihood of getting
 // an inaccurate reading because of reflections from objects
 // other than the intended target. It works best in dark
@@ -98,31 +98,31 @@ void setup() {
 
     Wire.begin();
 
-    sensor.setTimeout(500);
-    if (sensor.init()) {
-        Serial.println("Detected and initialized sensor");
+    vl53l0x.setTimeout(500);
+    if (vl53l0x.init()) {
+        Serial.println("Detected and initialized vl53l0x");
 
-        sensor.setTimeout(1000);
+        vl53l0x.setTimeout(1000);
 
 		uint32_t TimingBudget = HIGH_ACCURACY;
 
 #if defined LONG_RANGE
         // lower the return signal rate limit (default is 0.25 MCPS)
-        sensor.setSignalRateLimit(0.1);
+        vl53l0x.setSignalRateLimit(0.1);
         // increase laser pulse periods (defaults are 14 and 10 PCLKs)
-        sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
-        sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
+        vl53l0x.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+        vl53l0x.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
 #else
-        sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 12);
-        sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 8);
+        vl53l0x.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 12);
+        vl53l0x.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 8);
 		TimingBudget = VERY_HIGH_ACCURACY;
 
 #endif
-        sensor.setMeasurementTimingBudget(TimingBudget);
+        vl53l0x.setMeasurementTimingBudget(TimingBudget);
 
     }
     else {
-        Serial.println(F("Failed to detect and initialize sensor!"));
+        Serial.println(F("Failed to detect and initialize vl53l0x!"));
 		gStatusSensor = "NOK";
     }
 
@@ -183,18 +183,18 @@ void setup() {
 }
 
 uint16_t GetAverageDistance() {
-    uint16_t _SumTankFilled = 0;
-    uint16_t _Average = 0;
+    uint16_t SumTankFilled_ = 0;
+    uint16_t Average_ = 0;
 
-    for (uint8_t j = 0; j < gAverageTankFilled.size(); j++) {
-        _SumTankFilled += gAverageTankFilled[j];
+    for (uint8_t j_ = 0; j_ < gAverageTankFilled.size(); j_++) {
+        SumTankFilled_ += gAverageTankFilled[j_];
     }
 
     if (gAverageTankFilled.size() > 0) {
-        _Average = _SumTankFilled / gAverageTankFilled.size();
+        Average_ = SumTankFilled_ / gAverageTankFilled.size();
     }
 
-    return _Average;
+    return Average_;
 }
 
 String getCurrentTime() {
@@ -209,64 +209,63 @@ String getCurrentTime() {
 
 void GetDistance() {
 
-    if(MeasurementScheduler.IsTime()){
+    if (MeasurementScheduler.IsTime()) {
         MeasurementScheduler.UpdateNextTime();
 
         if (gStatusSensor == "NOK") {
-            WebSerial.printf("%s : Failed to detect and initialize sensor!\n", getCurrentTime());
+            WebSerial.printf("%s : Failed to detect and initialize vl53l0x!\n", getCurrentTime());
             return;
         }
 
+        uint32_t range_ = uint32_t(vl53l0x.readRangeSingleMillimeters() * gSensorCalibrationFactor);
 
-        uint32_t _range = uint32_t(sensor.readRangeSingleMillimeters() * gSensorCalibrationFactor);
-
-        if (!(sensor.timeoutOccurred())) {
+        if (!(vl53l0x.timeoutOccurred())) {
             gStatusSensor = "Ok";
 
-            if (_range < gDeadzoneUpper) {
-                _range = 0;
+            if (range_ < gDeadzoneUpper) {
+                range_ = 0;
             }
 
-            if (_range > gTankHeight - gDeadzoneLower) {
-                _range = gTankHeight;
+            if (range_ > gTankHeight - gDeadzoneLower) {
+                range_ = gTankHeight;
             }
 
-            gAverageTankFilled.pushOverwrite(gTankHeight - _range);
+            gAverageTankFilled.pushOverwrite(gTankHeight - range_);
 
-            uint16_t _Tankfilled = GetAverageDistance();
-            if (_Tankfilled != 0) {
-                gTankFilledPercent = 100 * _Tankfilled / gTankHeight; // %
+            uint16_t Tankfilled_ = GetAverageDistance();
+            if (Tankfilled_ != 0) {
+                gTankFilledPercent = 100 * Tankfilled_ / gTankHeight; // %
             }
             else {
                 gTankFilledPercent = 0;
             }
 
-			WebSerial.printf("%s : Distance: %dmm. Calibration factor: %f\n", getCurrentTime(), sensor.readRangeSingleMillimeters(), gSensorCalibrationFactor);
+            WebSerial.printf("%s : Distance: %dmm. Calibration factor: %f\n", getCurrentTime(), vl53l0x.readRangeSingleMillimeters(), gSensorCalibrationFactor);
 
-			DEBUG_PRINTF("Height: %dmm\n", gTankHeight);
-			DEBUG_PRINTF("Distance: %dmm\n", sensor.readRangeSingleMillimeters());
-			DEBUG_PRINTF("Filled: %dmm (%d%%)\n", gTankHeight - _range, gTankFilledPercent);
-			DEBUG_PRINTF("calibration factor: %f\n", gSensorCalibrationFactor);
-			DEBUG_PRINTLN("");
+            DEBUG_PRINTF("Height: %dmm\n", gTankHeight);
+            DEBUG_PRINTF("Distance: %dmm\n", vl53l0x.readRangeSingleMillimeters());
+            DEBUG_PRINTF("Filled: %dmm (%d%%)\n", gTankHeight - range_, gTankFilledPercent);
+            DEBUG_PRINTF("calibration factor: %f\n", gSensorCalibrationFactor);
+            DEBUG_PRINTLN("");
 
         }
         else {
             gStatusSensor = "Timeout";
-			WebSerial.printf("%s : Status Sensor %s; Calibration factor: %f\n", getCurrentTime(), gStatusSensor, gSensorCalibrationFactor);
-			DEBUG_PRINTLN(gStatusSensor);
+            WebSerial.printf("%s : Status Sensor %s; Calibration factor: %f\n", getCurrentTime(), gStatusSensor, gSensorCalibrationFactor);
+            DEBUG_PRINTLN(gStatusSensor);
         }
 
     }
 }
 
 void SendN2kFluidLevel(void) {
-    tN2kMsg N2kMsg;
+    tN2kMsg N2kMsg_;
 
     if (FluidLevelScheduler.IsTime()) {
         FluidLevelScheduler.UpdateNextTime();
 
-        SetN2kFluidLevel(N2kMsg, Config.Instance(), gFluidType, gTankFilledPercent, gTankCapacity);
-        NMEA2000.SendMsg(N2kMsg);
+        SetN2kFluidLevel(N2kMsg_, Config.Instance(), gFluidType, gTankFilledPercent, gTankCapacity);
+        NMEA2000.SendMsg(N2kMsg_);
     }
 }
 

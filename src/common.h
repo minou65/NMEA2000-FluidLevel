@@ -5,12 +5,6 @@
 #ifndef _COMMON_h
 #define _COMMON_h
 
-#if defined(ARDUINO) && ARDUINO >= 100
-#include "arduino.h"
-#else
-#include "WProgram.h"
-#endif
-
 #include "N2kMsg.h"
 #include "N2kTypes.h"
 #include "RingBuf.h"
@@ -46,7 +40,7 @@ extern bool gParamsChanged;
 #define STRING_LEN 40
 #define NUMBER_LEN 32
 
-static char FluidValues[][STRING_LEN] = {
+static char FluidValues[][3] = {
     "0",
     "1",
     "2",
@@ -55,7 +49,7 @@ static char FluidValues[][STRING_LEN] = {
     "5",
     "6"
 };
-static char FluidNames[][STRING_LEN] = {
+static char FluidNames[][15] = {
     "Fuel",
     "Water",
     "Gray water",
