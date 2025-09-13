@@ -135,9 +135,12 @@ void setup() {
     NMEA2000.SetProductInformation(
         "1", // Manufacturer's Model serial code
         100, // Manufacturer's product code
-        "FluidLevel",  // Manufacturer's Model ID
+        "VL53L0X level sensor",  // Manufacturer's Model ID
         Version,  // Manufacturer's Software version code
-        Version // Manufacturer's Model version
+        Version, // Manufacturer's Model version
+        1, // Load Equivalency
+        0xffff, // NMEA version
+        0xff  // Certification level
     );
 
     // Set device information
@@ -147,6 +150,12 @@ void setup() {
         75, // Device class=Sensor Communication Interface. See codes on https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
         2040 // Just choosen free from code list on https://web.archive.org/web/20190529161431/http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
     );
+
+    NMEA2000.SetConfigurationInformation(
+        String(id).c_str(), // Unique number
+        iotWebConf.getThingName(),
+        ""
+	);
 
 #ifdef DEBUG_NMEA_MSG
     Serial.begin(115200);
