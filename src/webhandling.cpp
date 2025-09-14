@@ -13,6 +13,7 @@
 #include <IotWebConfAsyncClass.h>
 #include <IotWebConfAsyncUpdateServer.h>
 #include <IotWebRoot.h>
+#include <Preferences.h>
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
 #define CONFIG_VERSION "A7"
@@ -25,7 +26,7 @@
 //      First it will light up (kept LOW), on Wifi connection it will blink,
 //      when connected to the Wifi it will turn off (kept HIGH).
 #define STATUS_PIN LED_BUILTIN
-#define ON_LEVEL LOW
+#define ON_LEVEL HIGH
 
 // -- Initial name of the Thing. Used e.g. as SSID of the own Access Point.
 const char thingName[] = "NMEA2000-FluidLevel";
@@ -34,9 +35,12 @@ uint8_t APModeOfflineTime = 0;
 Neotimer APModeTimer = Neotimer();
 
 // -- Method declarations.
+void onWebSerialMessage(uint8_t* data, size_t len);
 void handleData(AsyncWebServerRequest* request);
 void handleRoot(AsyncWebServerRequest* request);
 void convertParams();
+
+extern void calibrateSensor(int referenceDistance = 140, bool automatic = false);
 
 // -- Callback methods.
 void configSaved();
@@ -138,6 +142,7 @@ void wifiInit() {
     );
 
 	WebSerial.begin(&server, "/webserial");
+    WebSerial.onMessage(onWebSerialMessage);
 
     if (APModeOfflineTime > 0) {
         APModeTimer.start(APModeOfflineTime * 60 * 1000);
@@ -175,6 +180,70 @@ void wifiLoop() {
 
 void wifiConnected() {
     ArduinoOTA.begin();
+}
+
+void onWebSerialMessage(uint8_t* data, size_t len) {
+    String cmd_ = "";
+    Preferences prefs_;
+    for (size_t i_ = 0; i_ < len; i_++) {
+        cmd_ += (char)data[i_];
+    }
+    cmd_.trim();
+
+    // Beispielbefehl: set_roi 8 8 199
+    if (cmd_.startsWith("set_roi")) {
+        int roiX_ = 0, roiY_ = 0, roiC_ = 0;
+        int n_ = sscanf(cmd_.c_str(), "set_roi %d %d %d", &roiX_, &roiY_, &roiC_);
+        if (n_ == 3 &&
+            roiX_ >= 4 && roiX_ <= 16 &&
+            roiY_ >= 4 && roiY_ <= 16 &&
+            roiC_ >= 0 && roiC_ <= 255) {
+
+            WebSerial.printf("ROI set to %dx%d, center %d\n", roiX_, roiY_, roiC_);
+
+
+            prefs_.begin("vl53cal", false);
+			prefs_.putInt("roix", roiX_);
+			prefs_.putInt("roiy", roiY_);
+            prefs_.putInt("roic", roiC_);
+            prefs_.end();
+			WebSerial.println("ROI parameters saved to flash.");
+			gParamsChanged = true;
+
+        }
+        else {
+            WebSerial.println("Usage: set_roi <x:4-16> <y:4-16> <center:0-255>");
+        }
+    }
+    else if (cmd_.startsWith("start_calibration")) {
+		int referenceDistance_ = 0;
+        int n_ = sscanf(cmd_.c_str(), "start_calibration %d", &referenceDistance_);
+        if (n_ == 1 && referenceDistance_ >= 50 && referenceDistance_ <= 500) {
+            WebSerial.printf("Starting calibration with reference distance %dmm\n", referenceDistance_);
+            calibrateSensor(referenceDistance_, true);
+        }
+        else {
+            WebSerial.println("Usage: start_calibration <reference distance in mm:50-500>");
+        }
+    }
+	else if (cmd_.startsWith("get_roi")) {
+		prefs_.begin("vl53cal", true);
+		int roiX_ = prefs_.getInt("roix", 16);
+		int roiY_ = prefs_.getInt("roiy", 16);
+		int roiC_ = prefs_.getInt("roic", 199);
+		prefs_.end();
+		WebSerial.printf("Current ROI is %dx%d, center %d\n", roiX_, roiY_, roiC_);
+	}
+    else if (cmd_.startsWith("get_calibration")) {
+        prefs_.begin("vl53cal", true);
+        int offset_ = prefs_.getInt("offset", 0);
+        int xTalk_ = prefs_.getInt("xtalk", 0);
+        prefs_.end();
+        WebSerial.printf("Current calibration: Offset %dmm, Cross-talk %dkcps\n", offset_, xTalk_);
+	}
+    else {
+        WebSerial.println("Unknown command.");
+    }
 }
 
 void handleData(AsyncWebServerRequest* request) {
