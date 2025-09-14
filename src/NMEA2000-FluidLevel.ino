@@ -11,9 +11,10 @@
 #include <esp_task_wdt.h>
 #include <esp_mac.h>
 #include <Wire.h>
-#include <VL53L0X.h>
+#include <SparkFun_VL53L1X.h>
 #include <N2kMessages.h>
 #include <NMEA2000_CAN.h>
+#include <Preferences.h>
 
 #include "common.h"
 #include "webhandling.h"
@@ -21,6 +22,7 @@
 #include "neotimer.h"
 
 bool debugMode = false;
+uint8_t targetDistanceInMm = 100; // Used for calibration
 
 // Manufacturer's Software version code
 char Version[] = VERSION_STR;
@@ -51,19 +53,9 @@ uint8_t gDeadzoneLower = 0; //mm
 String gStatusSensor = "";
 
 
-VL53L0X vl53l0x;
-
-// Uncomment this line to use long range mode. This
-// increases the sensitivity of the vl53l0x and extends its
-// potential range, but increases the likelihood of getting
-// an inaccurate reading because of reflections from objects
-// other than the intended target. It works best in dark
-// conditions.
-//#define LONG_RANGE
-
-#define HIGH_SPEED 20000
-#define HIGH_ACCURACY 200000
-#define VERY_HIGH_ACCURACY 500000
+SFEVL53L1X VL53L1X;
+Neotimer temperatureUpdate = Neotimer(30 * 60 * 1000); // Update temperature compensation every 30 minutes
+Neotimer debouncer = Neotimer(100); // 100ms debounce time
 
 // List here messages your device will transmit.
 const unsigned long TransmitMessages[] PROGMEM = {
@@ -98,33 +90,24 @@ void setup() {
 
     Wire.begin();
 
-    vl53l0x.setTimeout(500);
-    if (vl53l0x.init()) {
-        Serial.println("Detected and initialized vl53l0x");
+    if (VL53L1X.begin() == 0) { //Begin returns 0 on a good init 
+         Serial.println("VL53L1X online!");
+         VL53L1X.setTimingBudgetInMs(800);         // Maximale Genauigkeit
+         VL53L1X.setDistanceModeLong();            // Long Mode für mehr Präzision
+		 VL53L1X.setIntermeasurementPeriod(1000); // Messung alle 1000ms, musste >= TimingBudget
+		 loadCalibration(VL53L1X);                 // Load calibration data from NVS
+		 VL53L1X.startTemperatureUpdate();
+         VL53L1X.startRanging();
 
-        vl53l0x.setTimeout(1000);
+		 temperatureUpdate.start(); // Start timer for temperature compensation
 
-		uint32_t TimingBudget = HIGH_ACCURACY;
-
-#if defined LONG_RANGE
-        // lower the return signal rate limit (default is 0.25 MCPS)
-        vl53l0x.setSignalRateLimit(0.1);
-        // increase laser pulse periods (defaults are 14 and 10 PCLKs)
-        vl53l0x.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
-        vl53l0x.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
-#else
-        vl53l0x.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 12);
-        vl53l0x.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 8);
-		TimingBudget = VERY_HIGH_ACCURACY;
-
-#endif
-        vl53l0x.setMeasurementTimingBudget(TimingBudget);
-
-    }
-    else {
-        Serial.println(F("Failed to detect and initialize vl53l0x!"));
+		 gStatusSensor = "Ok";
+     } else {
+        Serial.println(F("Failed to detect and initialize VL53L1X!"));
 		gStatusSensor = "NOK";
     }
+
+	debouncer.start();
 
     // Reserve enough buffer for sending all messages. This does not work on small memory devices like Uno or Mega
     NMEA2000.SetN2kCANMsgBufSize(8);
@@ -157,23 +140,7 @@ void setup() {
         ""
 	);
 
-#ifdef DEBUG_NMEA_MSG
-    Serial.begin(115200);
-    NMEA2000.SetForwardStream(&Serial);
-
-#ifdef DEBUG_NMEA_MSG_ASCII
-    NMEA2000.SetForwardType(tNMEA2000::fwdt_Text)
-#endif // DEBUG_NMEA_MSG_ASCII
-
-#ifdef  DEBUG_NMEA_Actisense
-        NMEA2000.SetDebugMode(tNMEA2000::dm_Actisense);
-#endif //  DEBUG_NMEA_Actisense
-
-#else
     NMEA2000.EnableForward(false); // Disable all msg forwarding to USB (=Serial)
-
-#endif // DEBUG_NMEA_MSG
-
 
     // If you also want to see all traffic on the bus use N2km_ListenAndNode instead of N2km_NodeOnly below
     NMEA2000.SetMode(tNMEA2000::N2km_NodeOnly, gN2KSource);
@@ -189,6 +156,148 @@ void setup() {
     // Initialize the Watchdog Timer
     esp_task_wdt_init(&wdt_config);
     esp_task_wdt_add(NULL); //add current thread to WDT watch
+
+    pinMode(GPIO_NUM_0, INPUT_PULLUP);
+
+	Serial.println("Setup complete");
+}
+
+void loadCalibration(SFEVL53L1X& sensor) {
+    Preferences prefs_;
+    prefs_.begin("vl53cal", true);
+    int offset_ = prefs_.getInt("offset", 0);
+    int xTalk_ = prefs_.getInt("xtalk", 0);
+	int roiX_ = prefs_.getInt("roix", 16);
+	int roiY_ = prefs_.getInt("roiy", 16);
+	int roic_ = prefs_.getInt("roic", 199);
+    prefs_.end();
+
+	if (offset_ < -500 || offset_ > 500) offset_ = 0;
+	if (xTalk_ < 0 || xTalk_ > 1000) xTalk_ = 0;
+	if (roiX_ < 4 || roiX_ > 16) roiX_ = 16;
+	if (roiY_ < 4 || roiY_ > 16) roiY_ = 16;
+	if (roic_ < 0 || roic_ > 255) roic_ = 199;
+
+    sensor.setOffset(offset_);
+    sensor.setXTalk(xTalk_);
+	sensor.setROI(roiX_, roiY_, roic_);
+
+    Serial.print("Loaded offset: ");
+    Serial.print(offset_);
+    Serial.println(" mm");
+
+    Serial.print("Loaded cross-talk: ");
+    Serial.print(xTalk_);
+    Serial.println(" kcps");
+
+	Serial.printf("Loaded ROI: %dx%d, center %d\n", roiX_, roiY_, roic_);
+}
+
+void calibrateSensor(int referenceDistance = 140, bool automatic = false) {
+
+    const int referenceDistance_ = referenceDistance; // mm
+    const int triggerThreshold_ = 100;  // mm
+    const int triggerCount_ = 20;       // ~1 second at 50ms timing budget
+    Preferences prefs_;
+
+    if (gStatusSensor == "NOK") {
+        Serial.println("Failed to detect and calibrate VL53L1X!");
+        if (automatic) {
+            WebSerial.println("Failed to detect and calibrate VL53L1X!");
+        }
+        return;
+    }
+
+    Serial.println();
+    Serial.println("*****************************************************************************************************");
+    Serial.println("                                    Offset calibration");
+    Serial.println("Place a light grey (17% gray) target at a distance of 140mm in front of the VL53L1X sensor.");
+    Serial.println("The calibration will start 5 seconds after a distance below 10 cm was detected for 1 second.");
+    Serial.println("Use the resulting offset distance as parameter for the setOffset() function called after begin().");
+    if (!automatic) {
+        Serial.println("If you are ready, press the button connected to GPIO0 (GND when pressed) to start the calibration.");
+        Serial.println("If you want to cancel the calibration, reboot the device.");
+    }
+    else {
+        Serial.println("Automatic calibration mode: starting immediately.");
+    }
+    Serial.println("*****************************************************************************************************");
+    Serial.println();
+
+    if (!automatic) {
+        // Wait until the button is released (HIGH)
+        while (digitalRead(GPIO_NUM_0) == LOW) {
+            esp_task_wdt_reset();
+            delay(10);
+        }
+        // Wait for a new button press (LOW), debounced
+        bool lastState_ = HIGH;
+        unsigned long lastChange_ = millis();
+        while (true) {
+            bool state_ = digitalRead(GPIO_NUM_0);
+            if (state_ != lastState_) {
+                lastChange_ = millis();
+                lastState_ = state_;
+            }
+            if (state_ == LOW && (millis() - lastChange_) > 50) { // 50ms debounce time
+                break;
+            }
+            esp_task_wdt_reset();
+            delay(5);
+        }
+
+        int tLowDistanceCount_ = 0;
+        while (tLowDistanceCount_ < triggerCount_) {
+            while (!VL53L1X.checkForDataReady()) delay(1);
+            int dist_ = VL53L1X.getDistance();
+            if (dist_ < triggerThreshold_) {
+                tLowDistanceCount_++;
+            }
+            else {
+                tLowDistanceCount_ = 0;
+            }
+            VL53L1X.clearInterrupt();
+        }
+
+        Serial.println("Target detected. Starting calibration in 5 seconds...");
+        delay(5000);
+    }
+
+    // Offset Calibration
+    Serial.println("Starting offset calibration...");
+    VL53L1X.calibrateOffset(referenceDistance_);
+    int offset_ = VL53L1X.getOffset();
+    Serial.print("Offset value determined: ");
+    Serial.print(offset_);
+    Serial.println(" mm");
+
+    prefs_.begin("vl53cal", false);
+    prefs_.putInt("offset", offset_);
+    prefs_.end();
+    Serial.println("Offset value saved to flash.");
+
+    // Cross-Talk Calibration
+    Serial.println("Starting cross-talk calibration...");
+    VL53L1X.calibrateXTalk(referenceDistance_);
+    int xTalk_ = VL53L1X.getXTalk();
+    Serial.print("Cross-talk value determined: ");
+    Serial.print(xTalk_);
+    Serial.println(" kcps");
+
+    prefs_.begin("vl53cal", false);
+    prefs_.putInt("xtalk", xTalk_);
+    prefs_.end();
+    Serial.println("Cross-talk value saved to flash.");
+
+    if (automatic) {
+        WebSerial.println("Calibration complete.");
+        WebSerial.printf("Offset: %d mm\n", offset_);
+        WebSerial.printf("Cross-talk: %d kcps\n", xTalk_);
+    }
+
+    Serial.println("Calibration complete.");
+
+    gParamsChanged = true;
 }
 
 uint16_t GetAverageDistance() {
@@ -222,48 +331,42 @@ void GetDistance() {
         MeasurementScheduler.UpdateNextTime();
 
         if (gStatusSensor == "NOK") {
-            WebSerial.printf("%s : Failed to detect and initialize vl53l0x!\n", getCurrentTime());
+            WebSerial.printf("%s : Failed to detect and initialize VL53L1X!\n", getCurrentTime());
             return;
         }
 
-        uint32_t range_ = uint32_t(vl53l0x.readRangeSingleMillimeters() * gSensorCalibrationFactor);
+        if (!VL53L1X.checkForDataReady()) {
+            WebSerial.printf("%s : Sensor not ready\n", getCurrentTime());
+            return;
+		}
 
-        if (!(vl53l0x.timeoutOccurred())) {
-            gStatusSensor = "Ok";
+		uint32_t distance_ = VL53L1X.getDistance();
 
-            if (range_ < gDeadzoneUpper) {
-                range_ = 0;
-            }
+        if (distance_ < gDeadzoneUpper) {
+            distance_ = 0;
+        }
 
-            if (range_ > gTankHeight - gDeadzoneLower) {
-                range_ = gTankHeight;
-            }
+        if (distance_ > gTankHeight - gDeadzoneLower) {
+            distance_ = gTankHeight;
+        }
 
-            gAverageTankFilled.pushOverwrite(gTankHeight - range_);
+        gAverageTankFilled.pushOverwrite(gTankHeight - distance_);
 
-            uint16_t Tankfilled_ = GetAverageDistance();
-            if (Tankfilled_ != 0) {
-                gTankFilledPercent = 100 * Tankfilled_ / gTankHeight; // %
-            }
-            else {
-                gTankFilledPercent = 0;
-            }
-
-            WebSerial.printf("%s : Distance: %dmm. Calibration factor: %f\n", getCurrentTime(), vl53l0x.readRangeSingleMillimeters(), gSensorCalibrationFactor);
-
-            DEBUG_PRINTF("Height: %dmm\n", gTankHeight);
-            DEBUG_PRINTF("Distance: %dmm\n", vl53l0x.readRangeSingleMillimeters());
-            DEBUG_PRINTF("Filled: %dmm (%d%%)\n", gTankHeight - range_, gTankFilledPercent);
-            DEBUG_PRINTF("calibration factor: %f\n", gSensorCalibrationFactor);
-            DEBUG_PRINTLN("");
-
+        uint16_t Tankfilled_ = GetAverageDistance();
+        if (Tankfilled_ != 0) {
+            gTankFilledPercent = 100 * Tankfilled_ / gTankHeight; // %
         }
         else {
-            gStatusSensor = "Timeout";
-            WebSerial.printf("%s : Status Sensor %s; Calibration factor: %f\n", getCurrentTime(), gStatusSensor, gSensorCalibrationFactor);
-            DEBUG_PRINTLN(gStatusSensor);
+            gTankFilledPercent = 0;
         }
 
+        WebSerial.printf("%s : Distance: %dmm. Calibration factor: %f\n", getCurrentTime(), distance_, gSensorCalibrationFactor);
+
+        DEBUG_PRINTF("Height: %dmm\n", gTankHeight);
+        DEBUG_PRINTF("Distance: %dmm\n", distance_);
+        DEBUG_PRINTF("Filled: %dmm (%d%%)\n", gTankHeight - distance_, gTankFilledPercent);
+        DEBUG_PRINTF("calibration factor: %f\n", gSensorCalibrationFactor);
+        DEBUG_PRINTLN("");
     }
 }
 
@@ -278,6 +381,8 @@ void SendN2kFluidLevel(void) {
     }
 }
 
+
+
 void loop() {
     esp_task_wdt_reset();
 
@@ -290,11 +395,30 @@ void loop() {
         gSaveParams = true;
     }
 
-    gParamsChanged = false;
+    if (gParamsChanged) {
+        gParamsChanged = false;
+		NMEA2000.SetInstallationDescription1(iotWebConf.getThingName());
+		loadCalibration(VL53L1X);
+	}
+
     GetDistance();
+
+    if(temperatureUpdate.repeat()) {
+        VL53L1X.startTemperatureUpdate();
+        WebSerial.printf("%s : Temperature compensation updated\n", getCurrentTime());
+	}
 
     // Dummy to empty input buffer to avoid board to stuck with e.g. NMEA Reader
     if (Serial.available()) {
         Serial.read();
     }
+
+    static bool lastDebouncedState_ = false;
+    debouncer.debounce(digitalRead(GPIO_NUM_0) == LOW);
+    bool currentDebouncedState_ = debouncer.getDebouncedState();
+
+    if (currentDebouncedState_ && !lastDebouncedState_) {
+        calibrateSensor();
+    }
+    lastDebouncedState_ = currentDebouncedState_;
 }
