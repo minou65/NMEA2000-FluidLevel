@@ -107,8 +107,8 @@ public:
     Sensor(const char* id, const char* name)
         : ParameterGroup(id, name),
         _CalibrationFactorParam("Calibration factor", _calibrationFactorId, _calibrationFactorValue, NUMBER_LEN, "1.0000", "e.g. 1.00001", "step='0.00001'"),
-        _DeadzoneUpperParam("Upper dead zone (mm)", _deadzoneUpperId, _deadzoneUpperValue, NUMBER_LEN, "0", "e.g. 1", "step='1'"),
-        _DeadzoneLowerParam("Lower dead zone (mm)", _deadzoneLowerId, _deadzoneLowerValue, NUMBER_LEN, "0", "e.g. 1", "step='1'")
+        _DeadzoneUpperParam("Sensor blind zone at top (mm)", _deadzoneUpperId, _deadzoneUpperValue, NUMBER_LEN, "0", "e.g. 1", "step='1'"),
+        _DeadzoneLowerParam("Sensor blind zone at bottom (mm)", _deadzoneLowerId, _deadzoneLowerValue, NUMBER_LEN, "0", "e.g. 1", "step='1'")
     {
         snprintf(_calibrationFactorId, STRING_LEN, "%s-calibration", this->getId());
         snprintf(_deadzoneUpperId, STRING_LEN, "%s-deadzoneupper", this->getId());
@@ -117,6 +117,8 @@ public:
         addItem(&_CalibrationFactorParam);
         addItem(&_DeadzoneUpperParam);
         addItem(&_DeadzoneLowerParam);
+
+		_CalibrationFactorParam.visible = false; // hide calibration factor by default
     }
 
     float getCalibrationFactor() const { return atof(_calibrationFactorValue); }
