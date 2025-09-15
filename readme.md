@@ -7,7 +7,7 @@
   - [Table of contents](#table-of-contents)
   - [Description](#description)
   - [NMEA 2000](#nmea-2000)
-  - [Librarys](#librarys)
+  - [Libraries](#libraries)
   - [Hardware](#hardware)
   - [Configuration](#configuration)
     - [System Configuration](#system-configuration)
@@ -25,6 +25,7 @@
       - [Height](#height)
     - [Sensor](#sensor)
       - [Calibration factor](#calibration-factor)
+      - [Calibration via WebSerial](#calibration-via-webserial)
       - [Upper dead zone](#upper-dead-zone)
       - [Lower dead zone](#lower-dead-zone)
   - [Default password](#default-password)
@@ -34,8 +35,9 @@
   - [Reset](#reset)
 
 ## Description
-A sensor based on a VL53L0X to determine the fill level in a tank. The VL53L0X is a Time-of-Flight (TOF) laser-ranging module. It can measure absolute distances up to 2m
-This sensor can be used to determine the fill level in a tank. The sensor VL53L0X is used for this and is a Time-of-Flight (TOF) laser-ranging module. It can measure absolute distances up to 2m, setting a new benchmark in ranging performance levels.
+
+A sensor based on a VL53L1X to determine the fill level in a tank. The VL53L1X is a Time-of-Flight (TOF) laser-ranging module. It can measure absolute distances up to 4m, setting a new benchmark in ranging performance levels.
+This sensor can be used to determine the fill level in a tank. The sensor VL53L1X is used for this and is a Time-of-Flight (TOF) laser-ranging module. It can measure absolute distances up to 4m.
 
 A measurement is taken every second. The average value is determined from 60 measurements.
 
@@ -49,18 +51,20 @@ The following PNG is send by this sensor.
 
 - 127505
 
-## Librarys
-- [VL53L0X](https://github.com/pololu/vl53l0x-arduino)
+## Libraries
+- [VL53L1X_Arduino](https://github.com/minou65/VL53L1X_Arduino)
 - [NMEA2000](https://github.com/ttlappalainen/NMEA2000)
-- [NMEA200_ESP32](https://github.com/ttlappalainen/NMEA2000_esp32)
+- [NMEA2000_esp32](https://github.com/ttlappalainen/NMEA2000_esp32)
 - [AsyncTCP (3.2.6) __"__](https://github.com/mathieucarbou/AsyncTCP)
 - [ESPAsyncWebServer (3.3.12) __*__](https://github.com/mathieucarbou/ESPAsyncWebServer)
-- [Webserial (2.0.7) __*__](https://github.com/ayushsharma82/WebSerial)
+- [WebSerial (2.0.7) __*__](https://github.com/ayushsharma82/WebSerial)
 - [IotWebConf](https://github.com/minou65/IotWebConf)
 - [IotWebConfAsync (1.0.2) __*__](https://github.com/minou65/IotWebConfAsync)
 - [IotWebRoot](https://github.com/minou65/IotWebRoot)
 
 __*__ new version and/or new repo
+
+
 
 ## Hardware
 [Hardware description](/doc/hardware.md)
@@ -123,6 +127,30 @@ X2 = value for the 50mm measurement
 
 ```
 Use the factor as your calibration factor. This 2 point slope should give you a good linear fit.
+
+#### Calibration via WebSerial
+Calibration and sensor configuration can be performed via the WebSerial console. The following commands are available:
+
+| Command | Description |
+| --- | --- |
+| `set_roi <x:4-16> <y:4-16> <center:0-255>` | Set the region of interest (ROI) for the sensor. |
+| `get_roi` | Show the current ROI settings. |
+| `start_calibration <reference distance in mm:50-500>` | Start the calibration procedure with a reference distance.<br>__Use with caution! This should ideally only be performed when the tank is empty, as it sets the sensor's baseline.__ |
+| `get_calibration` | Show the current calibration values (offset and cross-talk). |
+| `set_mode <1=short,2=long>` | Set the sensor mode (short or long distance). |
+| `get_mode` | Show the current sensor mode. |
+| `help` | Show all available commands. |
+
+Example usage:
+
+```text
+start_calibration 140
+get_calibration
+set_roi 8 8 199
+get_roi
+set_mode 2
+get_mode
+```
 
 #### Upper dead zone
 This value determines the dead zone at the top of the tank. If the reading is less than this value, then the tank is considered as full.
