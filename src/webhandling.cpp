@@ -226,6 +226,18 @@ void onWebSerialMessage(uint8_t* data, size_t len) {
             WebSerial.println("Usage: start_calibration <reference distance in mm:50-500>");
         }
     }
+    else if( cmd_.startsWith("set_mode")) {
+		int mode_ = -1;
+        int n_ = sscanf(cmd_.c_str(), "set_mode %d", &mode_);
+        if (n_ == 1 && (mode_ == 1 || mode_ == 2)) {
+            prefs_.begin("vl53cal", false);
+            prefs_.putInt("mode", mode_);
+            gParamsChanged = true;
+        }
+        else {
+            WebSerial.println("Usage: set_mode <1=short,2=long>");
+		}
+	}
 	else if (cmd_.startsWith("get_roi")) {
 		prefs_.begin("vl53cal", true);
 		int roiX_ = prefs_.getInt("roix", 16);
@@ -240,6 +252,22 @@ void onWebSerialMessage(uint8_t* data, size_t len) {
         int xTalk_ = prefs_.getInt("xtalk", 0);
         prefs_.end();
         WebSerial.printf("Current calibration: Offset %dmm, Cross-talk %dkcps\n", offset_, xTalk_);
+	}
+	else if (cmd_.startsWith("get_mode")) {
+		prefs_.begin("vl53cal", true);
+		int mode_ = prefs_.getInt("mode", 2);
+		prefs_.end();
+		WebSerial.printf("Current mode is %s\n", (mode_ == 1) ? "short" : "long");
+	}
+    else if (cmd_.startsWith("help")) {
+        WebSerial.println("Available commands:");
+        WebSerial.println(" set_roi <x:4-16> <y:4-16> <center:0-255>");
+        WebSerial.println(" get_roi");
+        WebSerial.println(" start_calibration <reference distance in mm:50-500>");
+		WebSerial.println(" get_calibration");
+		WebSerial.println(" set_mode <1=short,2=long>");
+        WebSerial.println(" get_mode");
+        WebSerial.println(" help");
 	}
     else {
         WebSerial.println("Unknown command.");
