@@ -92,11 +92,10 @@ void setup() {
 
     if (VL53L1X.begin() == 0) { //Begin returns 0 on a good init 
          Serial.println("VL53L1X online!");
-         VL53L1X.setTimingBudgetInMs(800);         // Maximale Genauigkeit
-         VL53L1X.setDistanceModeLong();            // Long Mode für mehr Präzision
-		 VL53L1X.setIntermeasurementPeriod(1000); // Messung alle 1000ms, musste >= TimingBudget
-		 loadCalibration(VL53L1X);                 // Load calibration data from NVS
-		 VL53L1X.startTemperatureUpdate();
+
+         loadCalibration(VL53L1X);                 // Load calibration data from NVS
+		 
+         VL53L1X.startTemperatureUpdate();
          VL53L1X.startRanging();
 
 		 temperatureUpdate.start(); // Start timer for temperature compensation
@@ -170,6 +169,7 @@ void loadCalibration(SFEVL53L1X& sensor) {
 	int roiX_ = prefs_.getInt("roix", 16);
 	int roiY_ = prefs_.getInt("roiy", 16);
 	int roic_ = prefs_.getInt("roic", 199);
+	int mode_ = prefs_.getInt("mode", 2); // 1=short, 2=long
     prefs_.end();
 
 	if (offset_ < -500 || offset_ > 500) offset_ = 0;
@@ -177,10 +177,27 @@ void loadCalibration(SFEVL53L1X& sensor) {
 	if (roiX_ < 4 || roiX_ > 16) roiX_ = 16;
 	if (roiY_ < 4 || roiY_ > 16) roiY_ = 16;
 	if (roic_ < 0 || roic_ > 255) roic_ = 199;
+	if (mode_ != 1 && mode_ != 2) mode_ = 2;
+
+    if (VL53L1X.isRanging()) {
+        VL53L1X.stopRanging();
+    }
 
     sensor.setOffset(offset_);
     sensor.setXTalk(xTalk_);
 	sensor.setROI(roiX_, roiY_, roic_);
+
+	if (mode_ == 1) {
+		sensor.setDistanceModeShort();
+	}
+	else {
+		sensor.setDistanceModeLong();
+	}
+
+    sensor.setTimingBudgetInMs(800);         // Maximale Genauigkeit
+    sensor.setIntermeasurementPeriod(1000); // Messung alle 1000ms, musste >= TimingBudget
+
+	sensor.startRanging();
 
     Serial.print("Loaded offset: ");
     Serial.print(offset_);
@@ -191,6 +208,8 @@ void loadCalibration(SFEVL53L1X& sensor) {
     Serial.println(" kcps");
 
 	Serial.printf("Loaded ROI: %dx%d, center %d\n", roiX_, roiY_, roic_);
+
+	Serial.printf("Loaded mode: %s\n", (mode_ == 1) ? "short" : "long");
 }
 
 void calibrateSensor(int referenceDistance = 140, bool automatic = false) {
@@ -223,6 +242,10 @@ void calibrateSensor(int referenceDistance = 140, bool automatic = false) {
     }
     Serial.println("*****************************************************************************************************");
     Serial.println();
+
+    if (VL53L1X.isRanging()) {
+        VL53L1X.stopRanging();
+	}
 
     if (!automatic) {
         // Wait until the button is released (HIGH)
