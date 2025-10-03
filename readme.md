@@ -56,16 +56,19 @@ The following PNG is send by this sensor.
 
 ## Libraries
 - [VL53L1X_Arduino](https://github.com/minou65/VL53L1X_Arduino)
+- [SparkFun VL53L1X Arduino Library](https://github.com/sparkfun/SparkFun_VL53L1X_Arduino_Library)
 - [NMEA2000](https://github.com/ttlappalainen/NMEA2000)
 - [NMEA2000_esp32](https://github.com/ttlappalainen/NMEA2000_esp32)
 - [AsyncTCP (3.2.6) __"__](https://github.com/mathieucarbou/AsyncTCP)
 - [ESPAsyncWebServer (3.3.12) __*__](https://github.com/mathieucarbou/ESPAsyncWebServer)
 - [WebSerial (2.0.7) __*__](https://github.com/ayushsharma82/WebSerial)
+- [ArduinoOTA](https://github.com/esp8266/Arduino/tree/master/libraries/ArduinoOTA) (ESP32 Core Library)
 - [IotWebConf](https://github.com/minou65/IotWebConf)
 - [IotWebConfAsync (1.0.2) __*__](https://github.com/minou65/IotWebConfAsync)
 - [IotWebRoot](https://github.com/minou65/IotWebRoot)
 
-__*__ new version and/or new repo
+__*__ new version and/or new repo  
+__"__ AsyncTCP fork with additional features
 
 ## Hardware
 [Hardware description](/doc/hardware.md)
