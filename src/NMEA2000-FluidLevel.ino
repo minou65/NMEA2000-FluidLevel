@@ -8,7 +8,6 @@
 #define ESP32_CAN_TX_PIN GPIO_NUM_5  // Set CAN TX port to D5 
 #define ESP32_CAN_RX_PIN GPIO_NUM_4  // Set CAN RX port to D4
 
-#include <esp_task_wdt.h>
 #include <esp_mac.h>
 #include <Wire.h>
 #include <SparkFun_VL53L1X.h>
@@ -22,18 +21,11 @@
 #include "neotimer.h"
 
 bool debugMode = false;
-uint8_t targetDistanceInMm = 100; // Used for calibration
+uint8_t targetDistanceInMm = 140; // Used for calibration
 
 // Manufacturer's Software version code
 char Version[] = VERSION_STR;
 
-// Configuration for the Watchdog Timer
-esp_task_wdt_config_t wdt_config = {
-    .timeout_ms = 5000, // Timeout in milliseconds
-    .trigger_panic = true // Trigger panic if the Watchdog Timer expires
-};
-
-uint8_t gN2KSource = 22;
 tN2kFluidType gFluidType = N2kft_GrayWater;
 
 bool gSaveParams = false;
@@ -41,14 +33,7 @@ bool gSaveParams = false;
 tN2kSyncScheduler FluidLevelScheduler(false, 2500, 500);
 tN2kSyncScheduler MeasurementScheduler(true, 1000, 0);
 
-RingBuf<uint16_t, 30> gAverageTankFilled;
-
-uint16_t gTankCapacity = 150; // l
-uint16_t gTankHeight = 1000; // mm
-uint8_t gTankFilledPercent = 0; // %
-float gSensorCalibrationFactor = 1.0;
-uint8_t gDeadzoneUpper = 0; //mm
-uint8_t gDeadzoneLower = 0; //mm
+RingBuf<uint16_t, TANK_RINGBUF_SIZE> gAverageTankFilled;
 
 String gStatusSensor = "";
 
@@ -56,6 +41,8 @@ String gStatusSensor = "";
 SFEVL53L1X VL53L1X;
 Neotimer temperatureUpdate = Neotimer(30 * 60 * 1000); // Update temperature compensation every 30 minutes
 Neotimer debouncer = Neotimer(100); // 100ms debounce time
+
+void calibrateSensor(int referenceDistance = 140, bool automatic = false);
 
 // List here messages your device will transmit.
 const unsigned long TransmitMessages[] PROGMEM = {
@@ -93,7 +80,8 @@ void setup() {
     if (VL53L1X.begin() == 0) { //Begin returns 0 on a good init 
          Serial.println("VL53L1X online!");
 
-         loadCalibration(VL53L1X);                 // Load calibration data from NVS
+		// calibrateSensor(targetDistanceInMm, true); // Calibrate with default distance
+         loadCalibration();
 		 
          VL53L1X.startTemperatureUpdate();
          VL53L1X.startRanging();
@@ -117,7 +105,7 @@ void setup() {
     NMEA2000.SetProductInformation(
         "1", // Manufacturer's Model serial code
         100, // Manufacturer's product code
-        "VL53L0X level sensor",  // Manufacturer's Model ID
+        "VL53L1X level sensor",  // Manufacturer's Model ID
         Version,  // Manufacturer's Software version code
         Version, // Manufacturer's Model version
         1, // Load Equivalency
@@ -142,7 +130,7 @@ void setup() {
     NMEA2000.EnableForward(false); // Disable all msg forwarding to USB (=Serial)
 
     // If you also want to see all traffic on the bus use N2km_ListenAndNode instead of N2km_NodeOnly below
-    NMEA2000.SetMode(tNMEA2000::N2km_NodeOnly, gN2KSource);
+    NMEA2000.SetMode(tNMEA2000::N2km_NodeOnly, Config.Source());
 
     // Here we tell library, which PGNs we transmit
     NMEA2000.ExtendTransmitMessages(TransmitMessages);
@@ -152,67 +140,70 @@ void setup() {
 
     Serial.println("NMEA2000 started");
 
-    // Initialize the Watchdog Timer
-    esp_task_wdt_init(&wdt_config);
-    esp_task_wdt_add(NULL); //add current thread to WDT watch
-
-    pinMode(GPIO_NUM_0, INPUT_PULLUP);
-
 	Serial.println("Setup complete");
 }
 
-void loadCalibration(SFEVL53L1X& sensor) {
+void resetCalibration() {
+    Preferences prefs_;
+    prefs_.begin("vl53cal", false);
+    prefs_.clear();
+    prefs_.end();
+    Serial.println("Calibration reset to defaults.");
+    
+	loadCalibration();
+}
+
+void loadCalibration() {
     Preferences prefs_;
     prefs_.begin("vl53cal", true);
     int offset_ = prefs_.getInt("offset", 0);
     int xTalk_ = prefs_.getInt("xtalk", 0);
 	int roiX_ = prefs_.getInt("roix", 16);
 	int roiY_ = prefs_.getInt("roiy", 16);
-	int roic_ = prefs_.getInt("roic", 199);
+	int roic_ = prefs_.getInt("roic", 163);
 	int mode_ = prefs_.getInt("mode", 2); // 1=short, 2=long
+	int sigma_ = prefs_.getInt("sigma", 50);
+	int timing_ = prefs_.getInt("timing", 300);
     prefs_.end();
 
 	if (offset_ < -500 || offset_ > 500) offset_ = 0;
 	if (xTalk_ < 0 || xTalk_ > 1000) xTalk_ = 0;
 	if (roiX_ < 4 || roiX_ > 16) roiX_ = 16;
 	if (roiY_ < 4 || roiY_ > 16) roiY_ = 16;
-	if (roic_ < 0 || roic_ > 255) roic_ = 199;
+	if (roic_ < 0 || roic_ > 255) roic_ = 163;
 	if (mode_ != 1 && mode_ != 2) mode_ = 2;
+	if (sigma_ > 200) sigma_ = 50;
 
     if (VL53L1X.isRanging()) {
         VL53L1X.stopRanging();
     }
 
-    sensor.setOffset(offset_);
-    sensor.setXTalk(xTalk_);
-	sensor.setROI(roiX_, roiY_, roic_);
-
-	if (mode_ == 1) {
-		sensor.setDistanceModeShort();
+    if (mode_ == 1) {
+        VL53L1X.setDistanceModeShort();
 	}
 	else {
-		sensor.setDistanceModeLong();
+        VL53L1X.setDistanceModeLong();
 	}
 
-    sensor.setTimingBudgetInMs(800);         // Maximale Genauigkeit
-    sensor.setIntermeasurementPeriod(1000); // Messung alle 1000ms, musste >= TimingBudget
+    VL53L1X.setOffset(offset_);
+    VL53L1X.setXTalk(xTalk_);
+    VL53L1X.setROI(roiX_, roiY_, roic_);
+    VL53L1X.setTimingBudgetInMs(timing_);
+	VL53L1X.setIntermeasurementPeriod(timing_ + 10); // intermeasurement must be > timing
+    VL53L1X.setSigmaThreshold(sigma_);
 
-	sensor.startRanging();
+    VL53L1X.startRanging();
 
-    Serial.print("Loaded offset: ");
-    Serial.print(offset_);
-    Serial.println(" mm");
-
-    Serial.print("Loaded cross-talk: ");
-    Serial.print(xTalk_);
-    Serial.println(" kcps");
-
+    Serial.printf("Loaded offset: %dmm\n", offset_);
+    Serial.printf("Loaded cross-talk: %dkcps\n", xTalk_);
 	Serial.printf("Loaded ROI: %dx%d, center %d\n", roiX_, roiY_, roic_);
-
 	Serial.printf("Loaded mode: %s\n", (mode_ == 1) ? "short" : "long");
+    Serial.printf("Loaded sigma threshold: %d mm\n", sigma_);
+	Serial.printf("Loaded timing budget: %d ms\n", timing_);
+
 }
 
-void calibrateSensor(int referenceDistance = 140, bool automatic = false) {
+void calibrateSensor(int referenceDistance, bool automatic) {
 
     const int referenceDistance_ = referenceDistance; // mm
     const int triggerThreshold_ = 100;  // mm
@@ -250,7 +241,6 @@ void calibrateSensor(int referenceDistance = 140, bool automatic = false) {
     if (!automatic) {
         // Wait until the button is released (HIGH)
         while (digitalRead(GPIO_NUM_0) == LOW) {
-            esp_task_wdt_reset();
             delay(10);
         }
         // Wait for a new button press (LOW), debounced
@@ -265,7 +255,6 @@ void calibrateSensor(int referenceDistance = 140, bool automatic = false) {
             if (state_ == LOW && (millis() - lastChange_) > 50) { // 50ms debounce time
                 break;
             }
-            esp_task_wdt_reset();
             delay(5);
         }
 
@@ -324,15 +313,15 @@ void calibrateSensor(int referenceDistance = 140, bool automatic = false) {
 }
 
 uint16_t GetAverageDistance() {
-    uint16_t SumTankFilled_ = 0;
+    uint16_t sumDistance_ = 0;
     uint16_t Average_ = 0;
 
     for (uint8_t j_ = 0; j_ < gAverageTankFilled.size(); j_++) {
-        SumTankFilled_ += gAverageTankFilled[j_];
+        sumDistance_ += gAverageTankFilled[j_];
     }
 
     if (gAverageTankFilled.size() > 0) {
-        Average_ = SumTankFilled_ / gAverageTankFilled.size();
+        Average_ = sumDistance_ / gAverageTankFilled.size();
     }
 
     return Average_;
@@ -350,47 +339,71 @@ String getCurrentTime() {
 
 void GetDistance() {
 
-    if (MeasurementScheduler.IsTime()) {
-        MeasurementScheduler.UpdateNextTime();
-
-        if (gStatusSensor == "NOK") {
-            WebSerial.printf("%s : Failed to detect and initialize VL53L1X!\n", getCurrentTime());
-            return;
-        }
-
-        if (!VL53L1X.checkForDataReady()) {
-            WebSerial.printf("%s : Sensor not ready\n", getCurrentTime());
-            return;
-		}
-
-		uint32_t distance_ = VL53L1X.getDistance();
-
-        if (distance_ < gDeadzoneUpper) {
-            distance_ = 0;
-        }
-
-        if (distance_ > gTankHeight - gDeadzoneLower) {
-            distance_ = gTankHeight;
-        }
-
-        gAverageTankFilled.pushOverwrite(gTankHeight - distance_);
-
-        uint16_t Tankfilled_ = GetAverageDistance();
-        if (Tankfilled_ != 0) {
-            gTankFilledPercent = 100 * Tankfilled_ / gTankHeight; // %
-        }
-        else {
-            gTankFilledPercent = 0;
-        }
-
-        WebSerial.printf("%s : Distance: %dmm. Calibration factor: %f\n", getCurrentTime(), distance_, gSensorCalibrationFactor);
-
-        DEBUG_PRINTF("Height: %dmm\n", gTankHeight);
-        DEBUG_PRINTF("Distance: %dmm\n", distance_);
-        DEBUG_PRINTF("Filled: %dmm (%d%%)\n", gTankHeight - distance_, gTankFilledPercent);
-        DEBUG_PRINTF("calibration factor: %f\n", gSensorCalibrationFactor);
-        DEBUG_PRINTLN("");
+    if (gStatusSensor == "NOK") {
+        WebSerial.printf("%s : Failed to detect and initialize VL53L1X!\n", getCurrentTime());
+        return;
     }
+
+    if (!VL53L1X.checkForDataReady()) {
+        WebSerial.printf("%s : Sensor not ready\n", getCurrentTime());
+        return;
+    }
+
+    uint16_t distanceEmpty_ = sensor.getDistanceEmpty();
+    uint16_t distanceFull_ = sensor.getDistanceFull();
+
+    if (distanceEmpty_ <= distanceFull_) {
+        WebSerial.printf("%s : Invalid distance configuration: Empty distance (%dmm) must be greater than full distance (%dmm)\n",
+            getCurrentTime(), distanceEmpty_, distanceFull_);
+        return;
+    }
+
+    auto distance_ = VL53L1X.getDistance();
+	auto status_ = VL53L1X.getRangeStatus();
+    float signal_ = VL53L1X.getSignalRate();
+    float signalPerSpad_ = VL53L1X.getSignalPerSpad();
+    float ambientRate_ = VL53L1X.getAmbientRate();
+	VL53L1X.clearInterrupt();
+
+    WebSerial.printf("Distanz: %d mm | Status: %d | Signalrate: %.2f kcps | Signal/SPAD: %.2f kcps/SPAD | Ambientrate: %.2f kcps\n",
+        distance_, status_, signal_, signalPerSpad_, ambientRate_);
+
+    if (distance_ > distanceEmpty_) distance_ = distanceEmpty_;
+
+    gAverageTankFilled.pushOverwrite(distance_);
+
+    uint16_t averageDistance_ = GetAverageDistance();
+
+    // Schnelle Änderung erkennen und Puffer resetten
+    if (abs((int)distance_ - (int)averageDistance_) > 0.1 * tank.getHeight()) {
+        for (int i = 0; i < TANK_RINGBUF_SIZE; ++i) {
+            gAverageTankFilled.pushOverwrite(distance_);
+        }
+    }
+
+}
+
+double GetFillLevel() {
+    uint16_t distanceEmpty_ = sensor.getDistanceEmpty();
+    uint16_t distanceFull_ = sensor.getDistanceFull();
+    uint16_t averageDistance_ = GetAverageDistance();
+
+    double fillLevel_ = 0.0;
+
+    if (averageDistance_ <= distanceFull_) {
+        fillLevel_ = 100.0;
+    }
+    else if (averageDistance_ >= distanceEmpty_) {
+        fillLevel_ = 0.0;
+    }
+    else {
+        fillLevel_ = 100.0 * (distanceEmpty_ - averageDistance_) / (distanceEmpty_ - distanceFull_);
+    }
+
+    // Auf eine Nachkommastelle runden
+    fillLevel_ = round(fillLevel_ * 10.0) / 10.0;
+
+    return fillLevel_;
 }
 
 void SendN2kFluidLevel(void) {
@@ -399,35 +412,35 @@ void SendN2kFluidLevel(void) {
     if (FluidLevelScheduler.IsTime()) {
         FluidLevelScheduler.UpdateNextTime();
 
-        SetN2kFluidLevel(N2kMsg_, Config.Instance(), gFluidType, gTankFilledPercent, gTankCapacity);
+        SetN2kFluidLevel(N2kMsg_, Config.Instance(), tank.getFluidType(), GetFillLevel(), tank.getCapacity());
         NMEA2000.SendMsg(N2kMsg_);
     }
 }
 
-
-
 void loop() {
-    esp_task_wdt_reset();
-
     SendN2kFluidLevel();
     NMEA2000.ParseMessages();
     wifiLoop();
 
-    if (NMEA2000.GetN2kSource() != gN2KSource) {
-        gN2KSource = NMEA2000.GetN2kSource();
+    if (MeasurementScheduler.IsTime()) {
+        MeasurementScheduler.UpdateNextTime();
+        GetDistance();
+    }
+
+    if (NMEA2000.GetN2kSource() != Config.Source()) {
+        Config.SetSource(NMEA2000.GetN2kSource());
         gSaveParams = true;
     }
 
     if (gParamsChanged) {
         gParamsChanged = false;
 		NMEA2000.SetInstallationDescription1(iotWebConf.getThingName());
-		loadCalibration(VL53L1X);
+		loadCalibration();
 	}
-
-    GetDistance();
 
     if(temperatureUpdate.repeat()) {
         VL53L1X.startTemperatureUpdate();
+		VL53L1X.startRanging();
         WebSerial.printf("%s : Temperature compensation updated\n", getCurrentTime());
 	}
 
@@ -435,13 +448,4 @@ void loop() {
     if (Serial.available()) {
         Serial.read();
     }
-
-    static bool lastDebouncedState_ = false;
-    debouncer.debounce(digitalRead(GPIO_NUM_0) == LOW);
-    bool currentDebouncedState_ = debouncer.getDebouncedState();
-
-    if (currentDebouncedState_ && !lastDebouncedState_) {
-        calibrateSensor();
-    }
-    lastDebouncedState_ = currentDebouncedState_;
 }
