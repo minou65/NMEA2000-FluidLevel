@@ -9,6 +9,9 @@
   - [NMEA 2000](#nmea-2000)
   - [Libraries](#libraries)
   - [Hardware](#hardware)
+  - [VL53L1X Calibration Guide](#vl53l1x-calibration-guide)
+    - [Key Measurement Parameters](#key-measurement-parameters)
+    - [VL53L1X Calibration Commands](#vl53l1x-calibration-commands)
   - [Configuration](#configuration)
     - [System Configuration](#system-configuration)
       - [Thing name](#thing-name)
@@ -64,10 +67,67 @@ The following PNG is send by this sensor.
 
 __*__ new version and/or new repo
 
-
-
 ## Hardware
 [Hardware description](/doc/hardware.md)
+
+## VL53L1X Calibration Guide
+
+Navigate to `ipaddress/webserial` to access the calibration interface.
+
+For successful VL53L1X calibration, the following measurement parameters are crucial. The actual distance value is less important - what matters is the stability and quality of the measurement:
+
+```text
+Distance: 112 mm | Status: 0 | Signalrate: 1696.00 kcps | Signal/SPAD: 59.00 kcps/SPAD | Ambientrate: 8.00 kcps
+Distance: 118 mm | Status: 0 | Signalrate: 1712.00 kcps | Signal/SPAD: 59.00 kcps/SPAD | Ambientrate: 8.00 kcps
+Distance: 117 mm | Status: 0 | Signalrate: 1816.00 kcps | Signal/SPAD: 63.00 kcps/SPAD | Ambientrate: 16.00 kcps
+Distance: 114 mm | Status: 0 | Signalrate: 1768.00 kcps | Signal/SPAD: 61.00 kcps/SPAD | Ambientrate: 8.00 kcps
+```
+
+### Key Measurement Parameters
+
+| Parameter              | Ideal Value                     | Interpretation                                                                 |
+|------------------------|----------------------------------|--------------------------------------------------------------------------------|
+| **Signalrate** (kcps)     | > 1200 kcps                      | High signal rate indicates strong target reflection. Values > 1000 kcps enable precise calibration. |
+|                        |                                  | Values < 500 kcps may lead to failed or inaccurate calibration.                |
+| **Signal/SPAD** (kcps/SPAD) | 60–65 kcps/SPAD                  | Indicates efficient SPAD usage. Values in this range suggest good optical coupling and stable conditions. |
+| **Ambientrate** (kcps)     | < 20 kcps, ideally < 10 kcps     | Low ambient light interference. Dark environments (e.g., inside tanks) are beneficial. |
+|                        |                                  | Values > 40 kcps may degrade measurement quality.                              |
+| **Status**              | Status = 0                       | Valid measurement. Other status codes (e.g., 4, 7) indicate errors or invalid data and should be avoided during calibration. |
+
+### VL53L1X Calibration Commands
+
+| Setter Command   | Parameters                     | Range / Format                  | Description                                                                 |
+|------------------|--------------------------------|----------------------------------|-----------------------------------------------------------------------------|
+| `set_roi`        | `<x> <y> <center>`             | x/y: 4–16, center: 0–255         | Sets Region of Interest (ROI) size and center SPAD.                         |
+| `set_offset`     | `<offset>`                    | -500 to +500 mm                 | Sets offset correction in millimeters.                                     |
+| `set_xtalk`      | `<xtalk>`                     | 0 to 1000 kcps                  | Sets cross-talk compensation rate.                                         |
+| `set_mode`       | `<mode>`                      | 1 = short, 2 = long             | Sets ranging mode (short or long distance).                                |
+| `set_sigma`      | `<sigma>`                     | 1 to 200 mm                     | Sets sigma threshold for measurement validity.                             |
+| `set_timing`     | `<timing>`                    | 20 to 2000 ms                   | Sets timing budget (integration time).                                     |
+
+| Getter Command   | Parameters                     | Description                                                           |
+|------------------|--------------------------------|------------------------------------------------------------------------|
+| `get_roi`        | *(none)*                       | Returns current ROI configuration (x, y, center).                      |
+| `get_offset`     | *(none)*                       | Returns current offset correction value.                              |
+| `get_xtalk`      | *(none)*                       | Returns current cross-talk compensation rate.                         |
+| `get_mode`       | *(none)*                       | Returns current ranging mode (short or long).                         |
+| `get_sigma`      | *(none)*                       | Returns current sigma threshold.                                      |
+| `get_timing`     | *(none)*                       | Returns current timing budget in milliseconds.                        |
+
+| Utility Command      | Parameters     | Description                                                                 |
+|----------------------|----------------|-----------------------------------------------------------------------------|
+| `reset_calibration`  | *(none)*       | Clears all stored calibration values (offset, xtalk, ROI, etc.) from flash.|
+| `reboot`             | *(none)*       | Restarts the microcontroller and reinitializes the sensor.                 |
+| `help`               | *(none)*       | Displays a list of available commands and usage instructions.              |
+
+
+
+
+
+
+
+
+
 
 ## Configuration
 After the first boot, there are some values needs to be set up.
