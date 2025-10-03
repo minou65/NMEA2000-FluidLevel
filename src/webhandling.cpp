@@ -41,6 +41,8 @@ void handleRoot(AsyncWebServerRequest* request);
 void convertParams();
 
 extern void calibrateSensor(int referenceDistance = 140, bool automatic = false);
+extern void resetCalibration();
+extern double GetFillLevel();
 
 // -- Callback methods.
 void configSaved();
@@ -158,9 +160,6 @@ void wifiLoop() {
 
     if (gSaveParams) {
         Serial.println(F("Parameters are changed,save them"));
-
-        Config.SetSource(gN2KSource);
-
         iotWebConf.saveConfig();
         gSaveParams = false;
     }
@@ -207,7 +206,7 @@ void onWebSerialMessage(uint8_t* data, size_t len) {
 			prefs_.putInt("roiy", roiY_);
             prefs_.putInt("roic", roiC_);
             prefs_.end();
-			WebSerial.println("ROI parameters saved to flash.");
+			WebSerial.printf("ROI set to x:%d y:%d center:%d and saved to flash\n");
 			gParamsChanged = true;
 
         }
@@ -215,28 +214,93 @@ void onWebSerialMessage(uint8_t* data, size_t len) {
             WebSerial.println("Usage: set_roi <x:4-16> <y:4-16> <center:0-255>");
         }
     }
-    else if (cmd_.startsWith("start_calibration")) {
-		int referenceDistance_ = 0;
-        int n_ = sscanf(cmd_.c_str(), "start_calibration %d", &referenceDistance_);
-        if (n_ == 1 && referenceDistance_ >= 50 && referenceDistance_ <= 500) {
-            WebSerial.printf("Starting calibration with reference distance %dmm\n", referenceDistance_);
-            calibrateSensor(referenceDistance_, true);
+    else if (cmd_.startsWith("set_offset")) {
+		int offset_ = 0;
+        int n_ = sscanf(cmd_.c_str(), "set_offset %d", &offset_);
+        if (n_ == 1 && offset_ >= -500 && offset_ <= 500) {
+            prefs_.begin("vl53cal", false);
+            prefs_.putInt("offset", offset_);
+			prefs_.end();
+			WebSerial.printf("Offset set to %dmm and saved to flash.\n", offset_);
+            gParamsChanged = true;
         }
         else {
-            WebSerial.println("Usage: start_calibration <reference distance in mm:50-500>");
+            WebSerial.println("Usage: set_offset <offset in mm:-500-500>");
         }
     }
+    else if (cmd_.startsWith("set_xtalk")) {
+        int xTalk_ = 0;
+        int n_ = sscanf(cmd_.c_str(), "set_xtalk %d", &xTalk_);
+        if (n_ == 1 && xTalk_ >= 0 && xTalk_ <= 1000) {
+            prefs_.begin("vl53cal", false);
+            prefs_.putInt("xtalk", xTalk_);
+            prefs_.end();
+            WebSerial.printf("Cross-talk set to %dkcps and saved to flash.\n", xTalk_);
+            gParamsChanged = true;
+        }
+        else {
+            WebSerial.println("Usage: set_xtalk <xtalk in kcps:0-1000>");
+        }
+    }
+	else if (cmd_.startsWith("reset_calibration")) {
+		resetCalibration();
+        WebSerial.println("Calibration resetet to defaults.");
+        gParamsChanged = true;
+	}
     else if( cmd_.startsWith("set_mode")) {
 		int mode_ = -1;
         int n_ = sscanf(cmd_.c_str(), "set_mode %d", &mode_);
         if (n_ == 1 && (mode_ == 1 || mode_ == 2)) {
             prefs_.begin("vl53cal", false);
             prefs_.putInt("mode", mode_);
+			prefs_.end();
+			WebSerial.printf("Mode set to %s and saved to flash.\n", (mode_ == 1) ? "short" : "long");
             gParamsChanged = true;
         }
         else {
             WebSerial.println("Usage: set_mode <1=short,2=long>");
 		}
+	}
+    else if (cmd_.startsWith("set_sigma")) {
+        int sigma_ = 0;
+        int n_ = sscanf(cmd_.c_str(), "set_sigma %d", &sigma_);
+        if (n_ == 1 && sigma_ > 0 && sigma_ <= 200) {
+            prefs_.begin("vl53cal", false);
+            prefs_.putInt("sigma", sigma_);
+            prefs_.end();
+            WebSerial.printf("Sigma threshold set to %dmm and saved to flash.\n", sigma_);
+            gParamsChanged = true;
+        }
+        else {
+            WebSerial.println("Usage: set_sigma <sigma in mm:1-200>");
+        }
+    }
+    else if (cmd_.startsWith("set_timeing")) {
+		int timing_ = 0;
+        int n_ = sscanf(cmd_.c_str(), "set_timing %d", &timing_);
+        if (n_ == 1 && timing_ >= 20 && timing_ <= 2000) {
+            prefs_.begin("vl53cal", false);
+            prefs_.putInt("timing", timing_);
+            prefs_.end();
+            WebSerial.printf("Timing budget set to %dms and saved to flash.\n", timing_);
+            gParamsChanged = true;
+        }
+        else {
+            WebSerial.println("Usage: set_timing <timing in ms:20-2000>");
+        }
+    }
+    else if (cmd_.startsWith("get_offset")) {
+        prefs_.begin("vl53cal", true);
+        int offset_ = prefs_.getInt("offset", 0);
+        prefs_.end();
+        WebSerial.printf("Current offset is %dmm\n", offset_);
+    }
+    else if (cmd_.startsWith("get_xtalk")) {
+        prefs_.begin("vl53cal", true);
+        int xTalk_ = prefs_.getInt("xtalk", 0);
+        prefs_.end();
+		WebSerial.printf("Current cross-talk is %dkcps\n", xTalk_);
+
 	}
 	else if (cmd_.startsWith("get_roi")) {
 		prefs_.begin("vl53cal", true);
@@ -259,6 +323,21 @@ void onWebSerialMessage(uint8_t* data, size_t len) {
 		prefs_.end();
 		WebSerial.printf("Current mode is %s\n", (mode_ == 1) ? "short" : "long");
 	}
+    else if (cmd_.startsWith("get_sigma")) {
+        prefs_.begin("vl53cal", true);
+        int sigma_ = prefs_.getInt("sigma", 50);
+        prefs_.end();
+        WebSerial.printf("Current sigma threshold is %dmm\n", sigma_);
+    }
+    else if (cmd_.startsWith("get_timing")) {
+		prefs_.begin("vl53cal", true);
+		int timing_ = prefs_.getInt("timing", 300);
+		prefs_.end();
+		WebSerial.printf("Current timing budget is %dms\n", timing_);
+    }
+    else if (cmd_.startsWith("reboot")) {
+        ESP.restart();
+	}
     else if (cmd_.startsWith("help")) {
         WebSerial.println("Available commands:");
         WebSerial.println(" set_roi <x:4-16> <y:4-16> <center:0-255>");
@@ -277,8 +356,8 @@ void onWebSerialMessage(uint8_t* data, size_t len) {
 void handleData(AsyncWebServerRequest* request) {
 	String json_ = "{";
 	json_ += "\"rssi\":" + String(WiFi.RSSI());
-	json_ += ",\"capacity\":" + String(gTankCapacity);
-	json_ += ",\"filledpercent\":" + String(gTankFilledPercent);
+	json_ += ",\"capacity\":" + String(tank.getCapacity());
+	json_ += ",\"filledpercent\":" + String(GetFillLevel(), 0);
 	json_ += ",\"status\":\"" + gStatusSensor + "\"";
 	json_ += "}";
 	request->send(200, "application/json", json_);
@@ -362,17 +441,7 @@ void handleRoot(AsyncWebServerRequest* request) {
 }
 
 void convertParams() {
-    gTankCapacity = tank.getCapacity();
-    gFluidType = tN2kFluidType(tank.getFluidType());
-    gTankHeight = tank.getHeight();
-    gSensorCalibrationFactor = sensor.getCalibrationFactor();
-    gDeadzoneUpper = sensor.getDeadzoneUpper();
-    gDeadzoneLower = sensor.getDeadzoneLower();
-
-    gN2KSource = Config.Source();
-
     APModeOfflineTime = atoi(APModeOfflineValue);
-
     ArduinoOTA.setHostname(iotWebConf.getThingName());
 }
 
