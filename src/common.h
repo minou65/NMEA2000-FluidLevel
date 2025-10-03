@@ -17,28 +17,19 @@ extern bool debugMode;
 
 extern tN2kFluidType gFluidType;
 
+
+#define TANK_RINGBUF_SIZE 30
+
 extern String gStatusSensor;
+extern RingBuf<uint16_t, TANK_RINGBUF_SIZE> gAverageTankFilled;
 
-extern uint16_t gTankCapacity; // l
-extern uint16_t gTankHeight; // mm
-extern uint16_t gTankfilled; // mm
-extern uint8_t gTankFilledPercent; // %
-extern float gSensorCalibrationFactor;
-extern uint8_t gDeadzoneUpper; //mm
-extern uint8_t gDeadzoneLower; //mm
-
-extern RingBuf<uint16_t, 30> gAverageTankFilled;
-
-
-extern uint8_t gN2KSource;
 extern bool gSaveParams;
+extern bool gParamsChanged;
 
 extern char Version[];
 
-extern bool gParamsChanged;
-
 #define STRING_LEN 40
-#define NUMBER_LEN 32
+#define NUMBER_LEN 5
 
 static char FluidValues[][3] = {
     "0",
