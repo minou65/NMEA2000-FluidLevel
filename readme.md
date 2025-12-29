@@ -12,6 +12,7 @@
   - [VL53L1X Calibration Guide](#vl53l1x-calibration-guide)
     - [Key Measurement Parameters](#key-measurement-parameters)
     - [VL53L1X Calibration Commands](#vl53l1x-calibration-commands)
+      - [Region of interest (ROI)](#region-of-interest-roi)
   - [Configuration](#configuration)
     - [System Configuration](#system-configuration)
       - [Thing name](#thing-name)
@@ -90,19 +91,18 @@ Distance: 114 mm | Status: 0 | Signalrate: 1768.00 kcps | Signal/SPAD: 61.00 kcp
 
 | Parameter              | Ideal Value                     | Interpretation                                                                 |
 |------------------------|----------------------------------|--------------------------------------------------------------------------------|
-| **Signalrate** (kcps)     | > 1200 kcps                      | High signal rate indicates strong target reflection. Values > 1000 kcps enable precise calibration. |
-|                        |                                  | Values < 500 kcps may lead to failed or inaccurate calibration.                |
+| **Signalrate** (kcps)     | > 1200 kcps                      | High signal rate indicates strong target reflection. Values > 1000 kcps enable precise calibration. </br> Values < 500 kcps may lead to failed or inaccurate calibration. |
 | **Signal/SPAD** (kcps/SPAD) | 60–65 kcps/SPAD                  | Indicates efficient SPAD usage. Values in this range suggest good optical coupling and stable conditions. |
 | **Ambientrate** (kcps)     | < 20 kcps, ideally < 10 kcps     | Low ambient light interference. Dark environments (e.g., inside tanks) are beneficial. |
 |                        |                                  | Values > 40 kcps may degrade measurement quality.                              |
-| **Status**              | Status = 0                       | Valid measurement. Other status codes (e.g., 4, 7) indicate errors or invalid data and should be avoided during calibration. |
+| **Status**              | Status = 0                       | Returns the range status, which can be any of the following. </br>0 = no error </br>1 = signal fail </br>2 = sigma fail </br>7 = wrapped target fail</br>Status codes other than 0 should be avoided during calibration. |
 
 ### VL53L1X Calibration Commands
 
 | Setter Command   | Parameters                     | Range / Format                  | Description                                                                 |
 |------------------|--------------------------------|----------------------------------|-----------------------------------------------------------------------------|
 | `set_roi`        | `<x> <y> <center>`             | x/y: 4–16, center: 0–255         | Sets Region of Interest (ROI) size and center SPAD.                         |
-| `set_offset`     | `<offset>`                    | -500 to +500 mm                 | Sets offset correction in millimeters.                                     |
+| `set_offset`     | `<offset>`                    | -500 to +500 mm                 | Sets offset correction in millimeters.                                    |
 | `set_xtalk`      | `<xtalk>`                     | 0 to 1000 kcps                  | Sets cross-talk compensation rate.                                         |
 | `set_mode`       | `<mode>`                      | 1 = short, 2 = long             | Sets ranging mode (short or long distance).                                |
 | `set_sigma`      | `<sigma>`                     | 1 to 200 mm                     | Sets sigma threshold for measurement validity.                             |
@@ -123,6 +123,7 @@ Distance: 114 mm | Status: 0 | Signalrate: 1768.00 kcps | Signal/SPAD: 61.00 kcp
 | `reboot`             | *(none)*       | Restarts the microcontroller and reinitializes the sensor.                 |
 | `help`               | *(none)*       | Displays a list of available commands and usage instructions.              |
 
+#### Region of interest (ROI)
 
 
 
