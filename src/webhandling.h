@@ -4,8 +4,16 @@
 #define _WEBHANDLING_h
 
 #include <Arduino.h>
-#include <IotWebConf.h>
+#include <IotWebConfAsync.h>
 #include <WebSerial.h>
+
+#include <ArduinoOTA.h>
+#include <WiFi.h>
+#include <DNSServer.h>
+#include <IotWebConfAsyncUpdateServer.h>
+#include <IotWebRoot.h>
+#include <Preferences.h>
+
 
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
 const char wifiInitialApPassword[] = "123456789";
@@ -14,7 +22,7 @@ extern void wifiInit();
 extern void wifiLoop();
 
 static WiFiClient wifiClient;
-extern IotWebConf iotWebConf;
+extern AsyncIotWebConf iotWebConf;
 
 class NMEAConfig : public iotwebconf::ParameterGroup {
 public:

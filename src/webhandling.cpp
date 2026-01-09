@@ -9,8 +9,6 @@
 #include "neotimer.h"
 
 #include <DNSServer.h>
-#include <IotWebConf.h>
-#include <IotWebConfAsyncClass.h>
 #include <IotWebConfAsyncUpdateServer.h>
 #include <IotWebRoot.h>
 #include <Preferences.h>
@@ -55,7 +53,7 @@ AsyncWebServer server(80);
 AsyncWebServerWrapper asyncWebServerWrapper(&server);
 AsyncUpdateServer AsyncUpdater;
 
-IotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
+AsyncIotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
 
 char APModeOfflineValue[STRING_LEN];
 iotwebconf::NumberParameter APModeOfflineParam = iotwebconf::NumberParameter("AP offline mode after (minutes)", "APModeOffline", APModeOfflineValue, NUMBER_LEN, "0", "0..30", "min='0' max='30', step='1'");
@@ -127,7 +125,7 @@ void wifiInit() {
     // -- Set up required URL handlers on the web server.
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) { handleRoot(request); });
     server.on("/config", HTTP_ANY, [](AsyncWebServerRequest* request) {
-        auto* asyncWebRequestWrapper_ = new AsyncWebRequestWrapper(request, 20480);
+        auto* asyncWebRequestWrapper_ = new AsyncWebRequestWrapper(request);
         iotWebConf.handleConfig(asyncWebRequestWrapper_);
         }
     );
@@ -138,7 +136,7 @@ void wifiInit() {
     );
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* request) { handleData(request); });
     server.onNotFound([](AsyncWebServerRequest* request) {
-        AsyncWebRequestWrapper asyncWebRequestWrapper(request, 1024);
+        AsyncWebRequestWrapper asyncWebRequestWrapper(request);
         iotWebConf.handleNotFound(&asyncWebRequestWrapper);
         }
     );
