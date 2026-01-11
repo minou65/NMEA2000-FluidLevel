@@ -7,14 +7,6 @@
 #include <IotWebConfAsync.h>
 #include <WebSerial.h>
 
-#include <ArduinoOTA.h>
-#include <WiFi.h>
-#include <DNSServer.h>
-#include <IotWebConfAsyncUpdateServer.h>
-#include <IotWebRoot.h>
-#include <Preferences.h>
-
-
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
 const char wifiInitialApPassword[] = "123456789";
 
