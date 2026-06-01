@@ -14,6 +14,8 @@
 #include <N2kMessages.h>
 #include <NMEA2000_CAN.h>
 #include <Preferences.h>
+#include <esp_task_wdt.h>
+#include <RebootManager.h>
 
 #include "common.h"
 #include "webhandling.h"
@@ -71,6 +73,10 @@ void setup() {
     }
 
     Serial.printf("Firmware version:%s\n", Version);
+
+    RebootManager::begin();
+    Serial.printf("Reboot count: %d\n", RebootManager::getRebootCount());
+    Serial.printf("Last reboot reason: %s\n", RebootManager::getLastRebootReasonText().c_str());
 
     // init wifi
     wifiInit();
@@ -137,6 +143,8 @@ void setup() {
 
     NMEA2000.SetOnOpen(OnN2kOpen);
     NMEA2000.Open();
+
+    esp_task_wdt_add(NULL);
 
     Serial.println("NMEA2000 started");
 
@@ -448,4 +456,6 @@ void loop() {
     if (Serial.available()) {
         Serial.read();
     }
+
+    esp_task_wdt_reset();
 }
