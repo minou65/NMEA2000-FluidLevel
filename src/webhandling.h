@@ -101,52 +101,8 @@ private:
     iotwebconf::SelectParameter _FluidTypeParam;
 };
 
-class Sensor : public iotwebconf::ParameterGroup {
-public:
-    Sensor(const char* id, const char* name)
-        : ParameterGroup(id, name),
-        _CalibrationFactorParam("Calibration factor", _calibrationFactorId, _calibrationFactorValue, NUMBER_LEN, "1.0000", "e.g. 1.00001", "step='0.00001'"),
-        _distanceFullParam("Distance (mm) when tank is full", _distanceFullId, _distanceFullValue, NUMBER_LEN, "50", "e.g. 50", "step='1'"),
-        _distanceEmptyParam("Distance (mm) when tank is empty", _distanceEmptyId, _distanceEmptyValue, NUMBER_LEN, "800", "e.g. 800", "step='1'")
-    {
-        snprintf(_calibrationFactorId, STRING_LEN, "%s-calibration", this->getId());
-        snprintf(_distanceFullId, STRING_LEN, "%s-distancefull", this->getId());
-        snprintf(_distanceEmptyId, STRING_LEN, "%s-distanceempty", this->getId());
-
-        addItem(&_CalibrationFactorParam);
-        addItem(&_distanceFullParam);
-        addItem(&_distanceEmptyParam);
-
-        _CalibrationFactorParam.visible = false; // hide calibration factor by default
-    }
-
-    float getCalibrationFactor() const { return atof(_calibrationFactorValue); }
-    uint16_t getDistanceFull() const { return static_cast<uint16_t>(atoi(_distanceFullValue)); }
-    uint16_t getDistanceEmpty() const { return static_cast<uint16_t>(atoi(_distanceEmptyValue)); }
-
-    void resetToDefaults() {
-        _CalibrationFactorParam.applyDefaultValue();
-        _distanceFullParam.applyDefaultValue();
-        _distanceEmptyParam.applyDefaultValue();
-    }
-
-private:
-    char _calibrationFactorId[STRING_LEN];
-    char _distanceFullId[STRING_LEN];
-    char _distanceEmptyId[STRING_LEN];
-
-    char _calibrationFactorValue[NUMBER_LEN]{};
-    char _distanceFullValue[NUMBER_LEN]{};
-    char _distanceEmptyValue[NUMBER_LEN]{};
-
-    iotwebconf::NumberParameter _CalibrationFactorParam;
-    iotwebconf::NumberParameter _distanceFullParam;
-    iotwebconf::NumberParameter _distanceEmptyParam;
-};
-
 extern NMEAConfig Config;
 extern Tank tank;
-extern Sensor sensor;
 
 #endif
 
