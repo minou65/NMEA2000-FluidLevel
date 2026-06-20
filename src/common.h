@@ -1,4 +1,3 @@
-// common.h
 
 #pragma once
 
@@ -17,16 +16,17 @@ extern bool debugMode;
 
 extern tN2kFluidType gFluidType;
 
-
 #define TANK_RINGBUF_SIZE 30
 
 extern String gStatusSensor;
-extern RingBuf<uint16_t, TANK_RINGBUF_SIZE> gAverageTankFilled;
+extern RingBuf<float, TANK_RINGBUF_SIZE> gAverageFillLevel;
 
 extern bool gSaveParams;
 extern bool gParamsChanged;
 
 extern char Version[];
+
+extern float getAverageFillLevel();
 
 #define STRING_LEN 40
 #define NUMBER_LEN 5
