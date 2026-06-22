@@ -114,6 +114,31 @@ When in AP mode, the default IP address is 192.168.4.1
 
 ## Operation
 
+### Web UI (Home/Monitoring page)
+The root page (`/`) shows the live monitoring overview:
+
+- **RSSI** (signal strength in dBm)
+- **Tank section** with:
+  - Tank type (for example: Gray water tank)
+  - Progress bar (fill level in %)
+  - Volume (configured capacity in liters)
+  - Filled (%)
+  - Sensor status (for example: `OK`, `Open circuit`, `Short circuit`)
+- **Sensor damping** section with status and control button
+- **Network** section (MAC address and current IP address)
+- Links to:
+  - `/config` (configure page)
+  - `/webserial` (sensor monitoring page)
+
+#### Sensor damping behavior
+- Default state is **Damping active**.
+- Pressing **Pause damping** disables damping for 15 minutes.
+- While damping is paused:
+  - The button changes to **Enable damping (mm:ss)**.
+  - Status changes to **Damping paused**.
+  - Fill value output uses the **current** reading instead of the averaged value.
+- Damping resumes automatically after 15 minutes, or immediately when **Enable damping** is pressed.
+
 ### Firmware Update
 To update the firmware, navigate to the Configuration page and click on the Firmware Update link. Follow the on-screen instructions to complete the update process.
 
