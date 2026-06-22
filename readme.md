@@ -14,6 +14,7 @@
       - [AP password](#ap-password)
       - [WiFi SSID](#wifi-ssid)
       - [WiFi password](#wifi-password)
+      - [Startup delay (seconds)](#startup-delay-seconds)
       - [AP offline mode after (minutes)](#ap-offline-mode-after-minutes)
     - [NMEA 2000 Settings](#nmea-2000-settings)
       - [Instance](#instance)
@@ -21,9 +22,12 @@
     - [Tank](#tank)
       - [Fluid type](#fluid-type)
       - [Capacity](#capacity)
+      - [Height](#height)
   - [First Start](#first-start)
     - [Default IP address](#default-ip-address)
   - [Operation](#operation)
+    - [Web UI (Home/Monitoring page)](#web-ui-homemonitoring-page)
+      - [Sensor damping behavior](#sensor-damping-behavior)
     - [Firmware Update](#firmware-update)
     - [Blinking codes](#blinking-codes)
     - [Reset](#reset)
@@ -40,7 +44,7 @@ A measurement is taken every second, and the average value is determined from 60
 
 The system communicates via the NMEA 2000 protocol, sending fluid level values as NMEA 2000 messages over an NMEA bus. Configuration is done through a web interface, and real-time values can be viewed on a website. Additionally, there's a link on the configuration page for convenient firmware updates.
 
-<img src="img/IMG_0271.jpeg" width=500>
+<img src="img/image001.jpg" width=500>
 
 ## NMEA 2000
 
@@ -54,7 +58,6 @@ The following PGN is sent by this sensor:
 - [AsyncTCP (3.2.6) __"__](https://github.com/mathieucarbou/AsyncTCP)
 - [ESPAsyncWebServer (3.3.12) __*__](https://github.com/mathieucarbou/ESPAsyncWebServer)
 - [WebSerial (2.0.7) __*__](https://github.com/ayushsharma82/WebSerial)
-- [ArduinoOTA](https://github.com/esp8266/Arduino/tree/master/libraries/ArduinoOTA) (ESP32 Core Library)
 - [IotWebConf](https://github.com/minou65/IotWebConf)
 - [IotWebConfAsync (1.0.2) __*__](https://github.com/minou65/IotWebConfAsync)
 - [IotWebRoot](https://github.com/minou65/IotWebRoot)
@@ -80,6 +83,10 @@ The name of the WiFi network you want the device to connect to. __*__
 #### WiFi password
 The password of the network above. Note that unsecured networks are not supported for your protection. __*__
 
+#### Startup delay (seconds)
+This is the startup delay before normal operation begins (AP timeout parameter from IotWebConf system settings).
+The field is visible on the config page and defaults to **30** seconds.
+
 #### AP offline mode after (minutes)
 If you don't plan to connect the sensor to a WiFi network, you don't need to configure the two options above. If you want to disable the WiFi after a certain time, you can use this option. Specify how long the WiFi should remain enabled after turning on the sensor. Valid values are from 0 to 30 minutes. A value of 0 means that WiFi is always enabled.
 
@@ -87,9 +94,11 @@ If you don't plan to connect the sensor to a WiFi network, you don't need to con
 
 #### Instance
 This should be unique at least on one device. May be best to have it unique over all devices sending this PGN. __*__
+Valid range is **1..254**.
 
 #### SID
 Sequence identifier. In most cases you can use just 255 for SID. The sequence identifier field is used to tie different PGNs data together to the same sampling or calculation time.
+Valid range is **1..255** (default: **255**).
 
 ### Tank
 #### Fluid type
@@ -104,6 +113,11 @@ Select the fluid type. Can be one of the following:
 
 #### Capacity
 The volume in liters that can be held in the tank. __*__
+Valid range is **1..1000 l** (default: **150 l**).
+
+#### Height
+Sensor/tank reference height in millimeters.
+Valid range is **1..2000 mm** (default: **1000 mm**).
 
 ## First Start
 
