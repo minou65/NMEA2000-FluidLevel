@@ -265,6 +265,19 @@ void OnN2kOpen() {
     MeasurementScheduler.UpdateNextTime();
 }
 
+void CheckN2kSourceAddressChange() {
+    if (!NMEA2000.ReadResetAddressChanged()) {
+        return;
+    }
+
+	uint8_t newSource = NMEA2000.GetN2kSource();
+    Serial.printf("NMEA2000 source address changed to %u\n", newSource);
+    Preferences prefs;
+    prefs.begin("n2k", false);
+    prefs.putUChar("N2KSource", newSource);
+	prefs.end();
+}
+
 // ============================================================================
 // SETUP
 // ============================================================================
@@ -300,6 +313,13 @@ void setup() {
     wifiInit();
 
     Serial.println("\nSetting up NMEA2000...");
+
+	// load N2K source address from Preferences if available
+	Preferences prefs_;
+	prefs_.begin("n2k", true); // read-only
+	uint8_t source_ = prefs_.getUChar("N2KSource", 22); // fallback: default 22
+	prefs_.end();
+
     NMEA2000.SetN2kCANMsgBufSize(8);
     NMEA2000.SetN2kCANReceiveFrameBufSize(250);
     NMEA2000.SetN2kCANSendFrameBufSize(250);
@@ -329,7 +349,7 @@ void setup() {
     );
 
     NMEA2000.EnableForward(false);
-    NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, Config.Source());
+    NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, source_);
     
     NMEA2000.ExtendTransmitMessages(TransmitMessages);
     NMEA2000.ExtendReceiveMessages(ReceiveMessages);
@@ -567,6 +587,8 @@ void loop() {
     SendN2kFluidLevel();
     NMEA2000.ParseMessages();
     wifiLoop();
+
+    CheckN2kSourceAddressChange();
 
     if (MeasurementScheduler.IsTime()) {
         MeasurementScheduler.UpdateNextTime();
