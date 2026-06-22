@@ -1,4 +1,3 @@
-
 #pragma once
 
 #ifndef _COMMON_h
@@ -21,12 +20,16 @@ extern tN2kFluidType gFluidType;
 extern String gStatusSensor;
 extern RingBuf<float, TANK_RINGBUF_SIZE> gAverageFillLevel;
 
+extern bool gDampingPaused;
+extern class Neotimer gDampingPauseTimer;
+
 extern bool gSaveParams;
 extern bool gParamsChanged;
 
 extern char Version[];
 
 extern float getAverageFillLevel();
+extern float getCurrentFillLevel();
 
 #define STRING_LEN 40
 #define NUMBER_LEN 5

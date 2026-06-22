@@ -406,6 +406,18 @@ float getAverageFillLevel() {
 }
 
 /**
+ * Get current fill level (most recent reading)
+ */
+float getCurrentFillLevel() {
+    // Returns the last added value from the ring buffer without averaging
+    // This is the most recent sensor reading
+    if (gAverageFillLevel.size() > 0) {
+        return gAverageFillLevel[gAverageFillLevel.size() - 1];
+    }
+    return 0.0f;
+}
+
+/**
  * Get current time as string
  */
 String getCurrentTime() {
@@ -484,7 +496,7 @@ void SendN2kFluidLevel(void) {
     if (FluidLevelScheduler.IsTime()) {
         FluidLevelScheduler.UpdateNextTime();
 
-        float fillLevel_ = getAverageFillLevel();
+        float fillLevel_ = gDampingPaused ? getCurrentFillLevel() : getAverageFillLevel();
 
         tN2kMsg N2kMsg_;
         SetN2kFluidLevel(N2kMsg_, Config.Instance(), tank.getFluidType(), fillLevel_, tank.getCapacity());

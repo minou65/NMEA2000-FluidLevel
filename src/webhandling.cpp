@@ -1,4 +1,3 @@
-
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <WiFi.h>
@@ -32,10 +31,15 @@ const char thingName[] = "NMEA2000-FluidLevel";
 uint8_t APModeOfflineTime = 0;
 Neotimer APModeTimer = Neotimer();
 
+// Damping pause functionality
+bool gDampingPaused = false;
+Neotimer gDampingPauseTimer = Neotimer(15 * 60 * 1000); // 15 Minuten
+
 // -- Method declarations.
 void onWebSerialMessage(uint8_t* data, size_t len);
 void handleData(AsyncWebServerRequest* request);
 void handleRoot(AsyncWebServerRequest* request);
+void handleToggleDamping(AsyncWebServerRequest* request);
 void convertParams();
 
 // -- Callback methods.
@@ -68,10 +72,10 @@ protected:
 CustomHtmlFormatProvider customHtmlFormatProvider;
 
 class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {
-protected:
+public:
     virtual String getScriptInner() {
         String s_ = HtmlRootFormatProvider::getScriptInner();
-        s_.replace("{millisecond}", "5000");
+        s_.replace("{millisecond}", "1000");
         s_ += F("function updateData(jsonData) {\n");
         s_ += F("   document.getElementById('RSSIValue').innerHTML = jsonData.rssi + \"dBm\" \n");
 
@@ -81,8 +85,48 @@ protected:
         s_ += F("   document.getElementById('capacityValue').innerHTML = jsonData.capacity; \n");
         s_ += F("   document.getElementById('filledpercentValue').innerHTML = jsonData.filledpercent; \n");
         s_ += F("   document.getElementById('statusValue').innerHTML = jsonData.status; \n");
+        
+        // Damping status update
+        s_ += F("   const dampingBtn = document.getElementById('dampingBtn'); \n");
+        s_ += F("   if (jsonData.dampingPaused) { \n");
+        s_ += F("       dampingBtn.innerHTML = 'Enable damping (' + jsonData.dampingRemaining + ')'; \n");
+        s_ += F("       dampingBtn.className = 'button button-on'; \n");
+        s_ += F("       document.getElementById('dampingStatus').innerHTML = 'Damping paused'; \n");
+        s_ += F("       document.getElementById('dampingStatus').style.color = 'orange'; \n");
+        s_ += F("   } else { \n");
+        s_ += F("       dampingBtn.innerHTML = 'Pause damping'; \n");
+        s_ += F("       dampingBtn.className = 'button'; \n");
+        s_ += F("       document.getElementById('dampingStatus').innerHTML = 'Damping active'; \n");
+        s_ += F("       document.getElementById('dampingStatus').style.color = 'green'; \n");
+        s_ += F("   } \n");
+        s_ += F("}\n");
+        
+        // Toggle damping function
+        s_ += F("function toggleDamping() {\n");
+        s_ += F("   fetch('/toggledamping').then(() => getData());\n");
         s_ += F("}\n");
 
+        return s_;
+    }
+    
+    virtual String getStyleInner() {
+        String s_ = HtmlRootFormatProvider::getStyleInner();
+        s_ += F(".button { \n");
+        s_ += F("   background-color: #4CAF50; \n");
+        s_ += F("   border: none; \n");
+        s_ += F("   color: white; \n");
+        s_ += F("   padding: 15px 32px; \n");
+        s_ += F("   text-align: center; \n");
+        s_ += F("   text-decoration: none; \n");
+        s_ += F("   display: inline-block; \n");
+        s_ += F("   font-size: 16px; \n");
+        s_ += F("   margin: 4px 2px; \n");
+        s_ += F("   cursor: pointer; \n");
+        s_ += F("   border-radius: 4px; \n");
+        s_ += F("} \n");
+        s_ += F(".button-on { \n");
+        s_ += F("   background-color: #ff9800; \n");
+        s_ += F("} \n");
         return s_;
     }
 };
@@ -137,6 +181,8 @@ void wifiInit() {
     );
 
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* request) { handleData(request); });
+    server.on("/toggledamping", HTTP_GET, [](AsyncWebServerRequest* request) { handleToggleDamping(request); });
+    
     server.onNotFound([](AsyncWebServerRequest* request) {
         AsyncWebRequestWrapper asyncWebRequestWrapper(request);
         iotWebConf.handleNotFound(&asyncWebRequestWrapper);
@@ -168,6 +214,12 @@ void wifiLoop() {
         Serial.println(F("AP mode offline time reached"));
         iotWebConf.goOffLine();
         APModeTimer.stop();
+    }
+    
+    // Check if damping pause timer is done
+    if (gDampingPaused && gDampingPauseTimer.done()) {
+        gDampingPaused = false;
+        Serial.println(F("Damping pause ended, resuming normal operation"));
     }
 
     if (AsyncUpdater.isFinished()) {
@@ -214,12 +266,46 @@ void onWebSerialMessage(uint8_t* data, size_t len) {
     }
 }
 
+void handleToggleDamping(AsyncWebServerRequest* request) {
+    if (gDampingPaused) {
+        // Re-enable damping
+        gDampingPaused = false;
+        gDampingPauseTimer.stop();
+        Serial.println(F("Damping re-enabled by user"));
+    }
+    else {
+        // Pause damping
+        gDampingPaused = true;
+        gDampingPauseTimer.restart();
+        Serial.println(F("Damping paused for 15 minutes"));
+    }
+    request->send(200, "text/plain", "OK");
+}
+
 void handleData(AsyncWebServerRequest* request) {
     String json_ = "{";
     json_ += "\"rssi\":" + String(WiFi.RSSI());
     json_ += ",\"capacity\":" + String(tank.getCapacity());
-    json_ += ",\"filledpercent\":" + String(getAverageFillLevel(), 0);
+
+    // If damping is paused, show current value, otherwise show average
+    float fillLevel_ = gDampingPaused ? getCurrentFillLevel() : getAverageFillLevel();
+    json_ += ",\"filledpercent\":" + String(fillLevel_, 0);
     json_ += ",\"status\":\"" + gStatusSensor + "\"";
+
+    // Damping status
+    json_ += ",\"dampingPaused\":" + String(gDampingPaused ? "true" : "false");
+
+    if (gDampingPaused) {
+        unsigned long remaining_ = gDampingPauseTimer.get() - gDampingPauseTimer.getElapsed();
+        int remainingMinutes_ = remaining_ / 60000;
+        int remainingSeconds_ = (remaining_ % 60000) / 1000;
+        json_ += ",\"dampingRemaining\":\"" + String(remainingMinutes_) + ":" +
+            (remainingSeconds_ < 10 ? "0" : "") + String(remainingSeconds_) + "\"";
+    }
+    else {
+        json_ += ",\"dampingRemaining\":\"\"";
+    }
+
     json_ += "}";
     request->send(200, "application/json", json_);
 }
@@ -234,17 +320,17 @@ void handleRoot(AsyncWebServerRequest* request) {
     MyHtmlRootFormatProvider fp_;
 
     content_ += fp_.getHtmlHead(iotWebConf.getThingName()).c_str();
-	content_ += fp_.getHtmlStyle().c_str();
+    content_ += fp_.getHtmlStyle().c_str();
 
     content_ += String(F("<link rel=\"icon\" type=\"image/png\" sizes=\"96x96\" href=\"/apple-touch-icon.png\">\n")).c_str();
     content_ += String(F("<link rel=\"apple-touch-icon\" sizes=\"96x96\" href=\"/apple-touch-icon.png\">\n")).c_str();
 
-	content_ += fp_.getHtmlHeadEnd().c_str();
-	content_ += fp_.getHtmlScript().c_str();
+    content_ += fp_.getHtmlHeadEnd().c_str();
+    content_ += fp_.getHtmlScript().c_str();
 
-	content_ += fp_.getHtmlTable().c_str();
-	content_ += fp_.getHtmlTableRow().c_str();
-	content_ += fp_.getHtmlTableCol().c_str();
+    content_ += fp_.getHtmlTable().c_str();
+    content_ += fp_.getHtmlTableRow().c_str();
+    content_ += fp_.getHtmlTableCol().c_str();
 
     content_ += String(F("<fieldset align=left style=\"border: 1px solid\">\n")).c_str();
     content_ += String(F("<table border=\"0\" align=\"center\" width=\"100%\">\n")).c_str();
@@ -262,6 +348,15 @@ void handleRoot(AsyncWebServerRequest* request) {
     content_ += String(F("<tr><td align=left>Volume: </td><td><span id='capacityValue'>0</span>l</td></tr>")).c_str();
     content_ += String(F("<tr><td align=left>Filled: </td><td><span id='filledpercentValue'>0</span>%</td></tr>")).c_str();
     content_ += String(F("<tr><td align=left>Sensor Status:</td><td><span id='statusValue'>no response</span></td></tr>")).c_str();
+    content_ += fp_.getHtmlTableEnd().c_str();
+    content_ += fp_.getHtmlFieldsetEnd().c_str();
+
+    // Damping Control Section
+    content_ += fp_.getHtmlFieldset("Sensor damping").c_str();
+    content_ += fp_.getHtmlTable().c_str();
+    content_ += String(F("<tr><td align=left>Status:</td><td><span id='dampingStatus'>Damping active</span></td></tr>")).c_str();
+    content_ += String(F("<tr><td colspan='2' align='center'><button id='dampingBtn' class='button' onclick='toggleDamping()'>Pause damping</button></td></tr>")).c_str();
+    content_ += String(F("<tr><td colspan='2' align='left' style='font-size:12px; color:#666;'>Damping will be paused for 15 minutes or can be manually reactivated.</td></tr>")).c_str();
     content_ += fp_.getHtmlTableEnd().c_str();
     content_ += fp_.getHtmlFieldsetEnd().c_str();
 
