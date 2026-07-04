@@ -4,7 +4,7 @@
 #define _WEBHANDLING_h
 
 #include <Arduino.h>
-#include <IotWebConf.h>
+#include <IotWebConfAsync.h>
 #include <WebSerial.h>
 
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
@@ -14,7 +14,7 @@ extern void wifiInit();
 extern void wifiLoop();
 
 static WiFiClient wifiClient;
-extern IotWebConf iotWebConf;
+extern AsyncIotWebConf iotWebConf;
 
 class NMEAConfig : public iotwebconf::ParameterGroup {
 public:
@@ -33,7 +33,6 @@ public:
     uint8_t Instance() { return atoi(InstanceValue); };
     uint8_t SID() { return atoi(SIDValue); };
     uint8_t Source() { return atoi(SourceValue); };
-
     void SetSource(uint8_t source_) {
         String s;
         s = (String)source_;
@@ -61,7 +60,6 @@ public:
     Tank(const char* id, const char* name)
         : ParameterGroup(id, name),
         _CapacityParam("Capacity (l)", _capacityId, _capacityValue, NUMBER_LEN, "150", "1..1000", "min='1' max='1000' step='1'"),
-        _HeightParam("Height (mm)", _heightId, _heightValue, NUMBER_LEN, "1000", "1..2000", "min='1' max='2000' step='1'"),
         _FluidTypeParam(
             "Fluid type", _fluidTypeId, _fluidTypeValue, sizeof(FluidValues[0]),
             (char*)FluidValues, (char*)FluidNames,
@@ -69,83 +67,100 @@ public:
             FluidNames[0])
     {
         snprintf(_capacityId, STRING_LEN, "%s-capacity", this->getId());
-        snprintf(_heightId, STRING_LEN, "%s-height", this->getId());
         snprintf(_fluidTypeId, STRING_LEN, "%s-fluidtype", this->getId());
 
         addItem(&_CapacityParam);
-        addItem(&_HeightParam);
         addItem(&_FluidTypeParam);
     }
 
-    uint16_t getCapacity() const { return static_cast<uint16_t>(atoi(_capacityValue)); }
-    uint16_t getHeight() const { return static_cast<uint16_t>(atoi(_heightValue)); }
-    uint8_t getFluidType() const { return static_cast<uint8_t>(atoi(_fluidTypeValue)); }
-    const char* getFluidTypeName() const { return FluidNames[getFluidType()]; }
+    uint16_t Capacity() const { return static_cast<uint16_t>(atoi(_capacityValue)); }
+    tN2kFluidType Type() const { return static_cast<tN2kFluidType>(atoi(_fluidTypeValue)); }
+    const char* TypeName() const { return FluidNames[Type()]; }
 
     void resetToDefaults() {
         _CapacityParam.applyDefaultValue();
-        _HeightParam.applyDefaultValue();
         _FluidTypeParam.applyDefaultValue();
     }
 
 private:
     char _capacityId[STRING_LEN];
-    char _heightId[STRING_LEN];
     char _fluidTypeId[STRING_LEN];
 
     char _capacityValue[NUMBER_LEN]{};
-    char _heightValue[NUMBER_LEN]{};
     char _fluidTypeValue[sizeof(FluidValues[0])]{};
 
     iotwebconf::NumberParameter _CapacityParam;
-    iotwebconf::NumberParameter _HeightParam;
     iotwebconf::SelectParameter _FluidTypeParam;
 };
 
-class Sensor : public iotwebconf::ParameterGroup {
-public:
-    Sensor(const char* id, const char* name)
-        : ParameterGroup(id, name),
-        _CalibrationFactorParam("Calibration factor", _calibrationFactorId, _calibrationFactorValue, NUMBER_LEN, "1.0000", "e.g. 1.00001", "step='0.00001'"),
-        _DeadzoneUpperParam("Upper dead zone (mm)", _deadzoneUpperId, _deadzoneUpperValue, NUMBER_LEN, "0", "e.g. 1", "step='1'"),
-        _DeadzoneLowerParam("Lower dead zone (mm)", _deadzoneLowerId, _deadzoneLowerValue, NUMBER_LEN, "0", "e.g. 1", "step='1'")
-    {
-        snprintf(_calibrationFactorId, STRING_LEN, "%s-calibration", this->getId());
-        snprintf(_deadzoneUpperId, STRING_LEN, "%s-deadzoneupper", this->getId());
-        snprintf(_deadzoneLowerId, STRING_LEN, "%s-deadzonelower", this->getId());
 
-        addItem(&_CalibrationFactorParam);
-        addItem(&_DeadzoneUpperParam);
-        addItem(&_DeadzoneLowerParam);
+class SensorConfig : public iotwebconf::ParameterGroup {
+public:
+    SensorConfig() : ParameterGroup("sensorconfig", "Sensor Calibration") {
+        snprintf(_resistanceFullId, STRING_LEN, "%s-rfull", this->getId());
+        snprintf(_resistanceEmptyId, STRING_LEN, "%s-rempty", this->getId());
+
+        this->addItem(&_ResistanceFullParam);
+        this->addItem(&_ResistanceEmptyParam);
     }
 
-    float getCalibrationFactor() const { return atof(_calibrationFactorValue); }
-    uint8_t getDeadzoneUpper() const { return static_cast<uint8_t>(atoi(_deadzoneUpperValue)); }
-    uint8_t getDeadzoneLower() const { return static_cast<uint8_t>(atoi(_deadzoneLowerValue)); }
+    float getResistanceFull() const {
+        float value = atof(_resistanceFullValue);
+        // Validate range
+        if (value < 1.0f || value > 500.0f) {
+            return 33.0f; // Default fallback
+        }
+        return value;
+    }
+
+    float getResistanceEmpty() const {
+        float value = atof(_resistanceEmptyValue);
+        // Validate range
+        if (value < 1.0f || value > 500.0f) {
+            return 205.0f; // Default fallback
+        }
+        return value;
+    }
 
     void resetToDefaults() {
-        _CalibrationFactorParam.applyDefaultValue();
-        _DeadzoneUpperParam.applyDefaultValue();
-        _DeadzoneLowerParam.applyDefaultValue();
+        _ResistanceFullParam.applyDefaultValue();
+        _ResistanceEmptyParam.applyDefaultValue();
     }
 
 private:
-    char _calibrationFactorId[STRING_LEN];
-    char _deadzoneUpperId[STRING_LEN];
-    char _deadzoneLowerId[STRING_LEN];
+    char _resistanceFullId[STRING_LEN];
+    char _resistanceEmptyId[STRING_LEN];
 
-    char _calibrationFactorValue[NUMBER_LEN]{};
-    char _deadzoneUpperValue[NUMBER_LEN]{};
-    char _deadzoneLowerValue[NUMBER_LEN]{};
+    char _resistanceFullValue[NUMBER_LEN]{};
+    char _resistanceEmptyValue[NUMBER_LEN]{};
 
-    iotwebconf::NumberParameter _CalibrationFactorParam;
-    iotwebconf::NumberParameter _DeadzoneUpperParam;
-    iotwebconf::NumberParameter _DeadzoneLowerParam;
+    iotwebconf::NumberParameter _ResistanceFullParam =
+        iotwebconf::NumberParameter(
+            "Resistance Full (Ohm)",
+            _resistanceFullId,
+            _resistanceFullValue,
+            NUMBER_LEN,
+            "33.0",
+            "1..500",
+            "min='1' max='500' step='0.1'"
+        );
+
+    iotwebconf::NumberParameter _ResistanceEmptyParam =
+        iotwebconf::NumberParameter(
+            "Resistance Empty (Ohm)",
+            _resistanceEmptyId,
+            _resistanceEmptyValue,
+            NUMBER_LEN,
+            "240.0",
+            "1..500",
+            "min='1' max='500' step='0.1'"
+        );
 };
+
 
 extern NMEAConfig Config;
 extern Tank tank;
-extern Sensor sensor;
+extern SensorConfig sensorConfig;
 
 #endif
 

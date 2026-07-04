@@ -1,5 +1,3 @@
-// common.h
-
 #pragma once
 
 #ifndef _COMMON_h
@@ -15,30 +13,24 @@ extern bool debugMode;
 #define DEBUG_PRINTLN(x) if (debugMode) Serial.println(x)
 #define DEBUG_PRINTF(...) if (debugMode) Serial.printf(__VA_ARGS__)
 
-extern tN2kFluidType gFluidType;
+#define TANK_RINGBUF_SIZE 30
 
-extern String gStatusSensor;
+extern String SensorStatus;
+extern RingBuf<float, TANK_RINGBUF_SIZE> gAverageFillLevel;
 
-extern uint16_t gTankCapacity; // l
-extern uint16_t gTankHeight; // mm
-extern uint16_t gTankfilled; // mm
-extern uint8_t gTankFilledPercent; // %
-extern float gSensorCalibrationFactor;
-extern uint8_t gDeadzoneUpper; //mm
-extern uint8_t gDeadzoneLower; //mm
+extern bool DampingPaused;
+extern class Neotimer DampingPauseTimer;
 
-extern RingBuf<uint16_t, 30> gAverageTankFilled;
-
-
-extern uint8_t gN2KSource;
-extern bool gSaveParams;
+extern bool ParamsSave;
+extern bool ParamsChanged;
 
 extern char Version[];
 
-extern bool gParamsChanged;
+extern float getAverageFillLevel();
+extern float getCurrentFillLevel();
 
 #define STRING_LEN 40
-#define NUMBER_LEN 32
+#define NUMBER_LEN 6
 
 static char FluidValues[][3] = {
     "0",
