@@ -6,7 +6,7 @@
 // - 240 Ohm = Tank EMPTY (0%)
 // - Open circuit (infinite resistance) = Tank EMPTY
 // - Short circuit (0 Ohm) = Tank EMPTY
-// ============================================================================
+// ============================================================================;
 
 // ============================================================================
 // BOARD CONFIGURATION
@@ -26,8 +26,8 @@
     // ----------------------------------------------------
     // Wemos D1 Mini ESP32 Pin Configuration
     // ----------------------------------------------------
-#define ESP32_CAN_TX_PIN GPIO_NUM_23    // CAN Bus TX Pin
-#define ESP32_CAN_RX_PIN GPIO_NUM_5     // CAN Bus RX Pin
+#define ESP32_CAN_TX_PIN GPIO_NUM_5     // CAN Bus TX Pin
+#define ESP32_CAN_RX_PIN GPIO_NUM_4     // CAN Bus RX Pin
 #define SENSOR_PIN       GPIO_NUM_36    // ADC pin for resistive sensor (VP, ADC1_CH0)
 
 #define BOARD_NAME "Wemos D1 Mini ESP32"
@@ -95,6 +95,7 @@
 #include <RebootManager.h>
 #include <time.h>
 #include <sys/time.h>
+#include <driver/twai.h>
 
 #include "common.h"
 #include "webhandling.h"
@@ -293,6 +294,16 @@ void setup() {
     }
 
     Serial.println("\n========================================");
+    Serial.println("Hardware Configuration Check");
+    Serial.println("========================================");
+    Serial.printf("Board: %s\n", BOARD_NAME);
+    Serial.printf("CAN TX Pin: GPIO%d\n", ESP32_CAN_TX_PIN);
+    Serial.printf("CAN RX Pin: GPIO%d\n", ESP32_CAN_RX_PIN);
+    Serial.printf("Sensor Pin: GPIO%d\n", SENSOR_PIN);
+    Serial.println("CAN Transceiver: MCP2562");
+    Serial.println("========================================");
+
+    Serial.println("========================================");
     Serial.println("NMEA2000 Resistive Fluid Level Sensor");
     Serial.println("========================================");
     Serial.printf("Firmware version: %s\n", Version);
@@ -310,17 +321,22 @@ void setup() {
     Serial.println("\nInitializing WiFi...");
     wifiInit();
 
-    Serial.println("\nSetting up NMEA2000...");
+    Serial.println("\n========================================");
+    Serial.println("Setting up NMEA2000...");
+    Serial.println("========================================");
 
-	// load N2K source address from Preferences if available
-	Preferences prefs_;
-	prefs_.begin("n2k", true); // read-only
-	uint8_t source_ = prefs_.getUChar("N2KSource", 22); // fallback: default 22
-	prefs_.end();
+    // load N2K source address from Preferences if available
+    Preferences prefs_;
+    prefs_.begin("n2k", true); // read-only
+    uint8_t source_ = prefs_.getUChar("N2KSource", 22); // fallback: default 22
+    prefs_.end();
+
+    Serial.printf("Requested N2K Source Address: %u\n", source_);
 
     NMEA2000.SetN2kCANMsgBufSize(8);
-    NMEA2000.SetN2kCANReceiveFrameBufSize(250);
-    NMEA2000.SetN2kCANSendFrameBufSize(250);
+    NMEA2000.SetN2kCANReceiveFrameBufSize(150);
+    NMEA2000.SetN2kCANSendFrameBufSize(150);
+    Serial.println("Buffer sizes configured");
 
     NMEA2000.SetProductInformation(
         "1",
@@ -332,6 +348,7 @@ void setup() {
         0xffff,
         0xff
     );
+    Serial.println("Product information set");
 
     NMEA2000.SetDeviceInformation(
         id,
@@ -339,32 +356,28 @@ void setup() {
         75,
         2040
     );
+    Serial.println("Device information set");
 
     NMEA2000.SetConfigurationInformation(
         String(id).c_str(),
         iotWebConf.getThingName(),
         ""
     );
+    Serial.println("Configuration information set");
 
     NMEA2000.EnableForward(false);
-    NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, source_);
-    
+    NMEA2000.SetMode(tNMEA2000::N2km_NodeOnly);
+    NMEA2000.SetN2kSource(source_);
+
     NMEA2000.ExtendTransmitMessages(TransmitMessages);
-    NMEA2000.ExtendReceiveMessages(ReceiveMessages);
-    
-    NMEA2000.SetMsgHandler(handleN2kMessages);
+//    NMEA2000.ExtendReceiveMessages(ReceiveMessages);
+
+//    NMEA2000.SetMsgHandler(handleN2kMessages);
     NMEA2000.SetOnOpen(OnN2kOpen);
     
-    Serial.println("Opening NMEA2000...");
     NMEA2000.Open();
 
     esp_task_wdt_add(NULL);
-
-    Serial.println("\n========================================");
-    Serial.println("NMEA2000 started");
-    Serial.println("Listening for GPS time on NMEA2000 bus");
-    Serial.println("Setup complete");
-    Serial.println("========================================\n");
 }
 
 // ============================================================================
@@ -587,18 +600,55 @@ void MeasureFillLevel() {
  * Send fluid level to NMEA2000 bus
  */
 void SendN2kFluidLevel(void) {
-    if (FluidLevelScheduler.IsTime()) {
-        FluidLevelScheduler.UpdateNextTime();
+    if (!FluidLevelScheduler.IsTime()) {
+        return;
+    }
 
-        float fillLevel_ = DampingPaused ? getCurrentFillLevel() : getAverageFillLevel();
+    FluidLevelScheduler.UpdateNextTime();
 
-        tN2kMsg N2kMsg_;
-        SetN2kFluidLevel(N2kMsg_, Config.Instance(), tank.Type(), fillLevel_, tank.Capacity());
-        NMEA2000.SendMsg(N2kMsg_);
+    float fillLevel_ = DampingPaused ? getCurrentFillLevel() : getAverageFillLevel();
 
-        if (debugMode) {
-            Serial.printf("Sent NMEA2000: %.1f%% (%.1fL / %.1fL)\n",
-                fillLevel_, fillLevel_ * tank.Capacity() / 100.0f, tank.Capacity());
+    // Validate and constrain level
+    if (isnan(fillLevel_) || fillLevel_ < 0.0f) {
+        fillLevel_ = N2kDoubleNA;
+    }
+    else {
+        fillLevel_ = constrain(fillLevel_, 0.0f, 100.0f);
+    }
+
+    // DEBUG: Print tank info
+    if (debugMode) {
+        Serial.printf("DEBUG - Tank Capacity: %.1fL\n", tank.Capacity());
+        Serial.printf("DEBUG - Tank Type: %d\n", tank.Type());
+        Serial.printf("DEBUG - Instance: %d\n", Config.Instance());
+        Serial.printf("DEBUG - Fill Level: %.1f%%\n", fillLevel_);
+    }
+
+    // Create and send message
+    tN2kMsg N2kMsg_;
+    SetN2kFluidLevel(N2kMsg_, Config.Instance(), tank.Type(), fillLevel_, tank.Capacity());
+
+    bool success = NMEA2000.SendMsg(N2kMsg_);
+
+    // Output
+    if (debugMode) {
+        if (success) {
+            if (fillLevel_ == N2kDoubleNA) {
+                Serial.println("Sent NMEA2000: Level unavailable");
+            }
+            else {
+                float volumeLiters = fillLevel_ * tank.Capacity() / 100.0f;
+                Serial.printf("Sent NMEA2000: %.1f%% (%.1fL / %.1fL)\n",
+                    fillLevel_, volumeLiters, tank.Capacity());
+
+                // WARNING if capacity is zero
+                if (tank.Capacity() <= 0.0f) {
+                    Serial.println("WARNING: Tank capacity is zero! Check configuration.");
+                }
+            }
+        }
+        else {
+            Serial.println("Failed to send NMEA2000 message!");
         }
     }
 }
