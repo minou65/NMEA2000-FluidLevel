@@ -10,6 +10,7 @@
 ## Table of contents
 - [NMEA 2000 Fluidmonitor](#nmea-2000-fluidmonitor)
   - [Table of contents](#table-of-contents)
+  - [Important Hint](#important-hint)
   - [Description](#description)
   - [Related Projects](#related-projects)
   - [Hardware](#hardware)
@@ -28,6 +29,9 @@
     - [Firmware Update](#firmware-update)
     - [Blinking codes](#blinking-codes)
     - [Reset](#reset)
+
+## Important Hint
+Although the term NMEA2000 is used here, the software and device are **not certified NMEA2000 products** and have not passed any official approval process. There is a possibility that the software or hardware does not fully comply with the NMEA2000 specification in all details. If you connect this device to your NMEA2000 network, you do so at your own risk.
 
 ## Description
 
