@@ -9,7 +9,7 @@
 
 #include <DNSServer.h>
 #include <IotWebConfAsyncUpdateServer.h>
-#include <IotWebRoot.h>
+#include <IotWebRootTab.h>
 #include <Preferences.h>
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
@@ -40,11 +40,11 @@ void onWebSerialMessage(uint8_t* data, size_t len);
 void handleData(AsyncWebServerRequest* request);
 void handleRoot(AsyncWebServerRequest* request);
 void handleToggleDamping(AsyncWebServerRequest* request);
-void convertParams();
 
 // -- Callback methods.
-void configSaved();
 void wifiConnected();
+void convertParams();
+void configSaved();
 
 bool ParamsChanged = true;
 
@@ -72,10 +72,10 @@ protected:
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
 
-class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {
+class MyHtmlRootFormatProvider : public TabHtmlRootFormatProvider {
 public:
     virtual String getScriptInner() {
-        String s_ = HtmlRootFormatProvider::getScriptInner();
+        String s_ = TabHtmlRootFormatProvider::getScriptInner();
         s_.replace("{millisecond}", "1000");
         s_ += F("function updateData(jsonData) {\n");
         s_ += F("   document.getElementById('RSSIValue').innerHTML = jsonData.rssi + \"dBm\" \n");
@@ -111,7 +111,7 @@ public:
     }
     
     virtual String getStyleInner() {
-        String s_ = HtmlRootFormatProvider::getStyleInner();
+        String s_ = TabHtmlRootFormatProvider::getStyleInner();
         s_ += F(".button { \n");
         s_ += F("   background-color: #4CAF50; \n");
         s_ += F("   border: none; \n");
@@ -330,86 +330,74 @@ void handleRoot(AsyncWebServerRequest* request) {
         return;
     }
 
-    std::string content_;
+    AsyncResponseStream* response_ = request->beginResponseStream("text/html", 2048);
     MyHtmlRootFormatProvider fp_;
 
-    content_ += fp_.getHtmlHead(iotWebConf.getThingName()).c_str();
-    content_ += fp_.getHtmlStyle().c_str();
+    // === Create 3 Tabs ===
+    fp_.addTab("Tank", "tank");
+    fp_.addTab("Sensor", "sensor");
+    fp_.addTab("System", "system");
 
-    content_ += String(F("<link rel=\"icon\" type=\"image/png\" sizes=\"96x96\" href=\"/favicon.ico\">\n")).c_str();
-    content_ += String(F("<link rel=\"apple-touch-icon\" sizes=\"96x96\" href=\"/apple-touch-icon.png\">\n")).c_str();
+    // === TAB 1: Tank Status ===
+    String tankTab_ = "";
+    tankTab_ += F("<fieldset align=left style=\"border: 1px solid\"><table border=\"0\" align=\"center\" width=\"100%\">");
+    tankTab_ += F("<tr><td align=\"left\">RSSI:</td><td align=\"right\"><span id=\"RSSIValue\">no data</span></td></tr></table></fieldset>");
+    
+    tankTab_ += fp_.getHtmlFieldset(String(tank.TypeName()) + " tank");
+    tankTab_ += fp_.getHtmlTable();
+    tankTab_ += fp_.getHtmlTableRow();
+    tankTab_ += fp_.getHtmlTableCol();
+    tankTab_ += F("<progress id=\"tankValue\" style=\"height:50px\" max=\"100\" value=\"0\">0%</progress>\n");
+    tankTab_ += fp_.getHtmlTableColEnd();
+    tankTab_ += fp_.getHtmlTableRowEnd();
+    tankTab_ += F("<tr><td align=left>Volume: </td><td><span id='capacityValue'>0</span>l</td></tr>");
+    tankTab_ += F("<tr><td align=left>Filled: </td><td><span id='filledpercentValue'>0</span>%</td></tr>");
+    tankTab_ += F("<tr><td align=left>Sensor Status:</td><td><span id='statusValue'>no response</span></td></tr>");
+    tankTab_ += fp_.getHtmlTableEnd();
+    tankTab_ += fp_.getHtmlFieldsetEnd();
+    fp_.addString(tankTab_, "tank");
 
-    content_ += fp_.getHtmlHeadEnd().c_str();
-    content_ += fp_.getHtmlScript().c_str();
+    // === TAB 2: Sensor Damping Control ===
+    String sensorTab_ = "";
+    sensorTab_ += fp_.getHtmlFieldset("Sensor damping");
+    sensorTab_ += fp_.getHtmlTable();
+    sensorTab_ += F("<tr><td align=left>Status:</td><td><span id='dampingStatus'>Damping active</span></td></tr>");
+    sensorTab_ += F("<tr><td colspan='2' align='center'><button id='dampingBtn' class='button' onclick='toggleDamping()'>Pause damping</button></td></tr>");
+    sensorTab_ += F("<tr><td colspan='2' align='left' style='font-size:12px; color:#666;'>Damping will be paused for 15 minutes or can be manually reactivated.</td></tr>");
+    sensorTab_ += fp_.getHtmlTableEnd();
+    sensorTab_ += fp_.getHtmlFieldsetEnd();
+    fp_.addString(sensorTab_, "sensor");
 
-    content_ += fp_.getHtmlTable().c_str();
-    content_ += fp_.getHtmlTableRow().c_str();
-    content_ += fp_.getHtmlTableCol().c_str();
+    // === TAB 3: System Info ===
+    String systemTab_ = "";
+    systemTab_ += fp_.getHtmlFieldset("Network");
+    systemTab_ += fp_.getHtmlTable();
+    systemTab_ += fp_.getHtmlTableRowText("MAC Address:", WiFi.macAddress());
+    systemTab_ += fp_.getHtmlTableRowText("IP Address:", WiFi.localIP().toString());
+    systemTab_ += fp_.getHtmlTableEnd();
+    systemTab_ += fp_.getHtmlFieldsetEnd();
+    fp_.addString(systemTab_, "system");
 
-    content_ += String(F("<fieldset align=left style=\"border: 1px solid\">\n")).c_str();
-    content_ += String(F("<table border=\"0\" align=\"center\" width=\"100%\">\n")).c_str();
-    content_ += String(F("<tr><td align=\"left\"> </td></td><td align=\"right\"><span id=\"RSSIValue\">no data</span></td></tr>\n")).c_str();
-    content_ += fp_.getHtmlTableEnd().c_str();
-    content_ += fp_.getHtmlFieldsetEnd().c_str();
+    // === HTML Output ===
+    response_->print(fp_.getHtmlHead(iotWebConf.getThingName()));
+    response_->print(F("<link rel=\"icon\" type=\"image/png\" sizes=\"96x96\" href=\"/favicon.ico\">\n"));
+    response_->print(F("<link rel=\"apple-touch-icon\" sizes=\"96x96\" href=\"/apple-touch-icon.png\">\n"));
+    response_->print(fp_.getHtmlHeadEnd());
+    response_->print(fp_.getHtmlTabs());
 
-    content_ += fp_.getHtmlFieldset(String(tank.TypeName()) + " tank").c_str();
-    content_ += fp_.getHtmlTable().c_str();
-    content_ += fp_.getHtmlTableRow().c_str();
-    content_ += fp_.getHtmlTableCol().c_str();
-    content_ += String(F("<progress id=\"tankValue\" style=\"height:50px\" max=\"100\" value=\"0\">0%</progress>\n")).c_str();
-    content_ += fp_.getHtmlTableColEnd().c_str();
-    content_ += fp_.getHtmlTableRowEnd().c_str();
-    content_ += String(F("<tr><td align=left>Volume: </td><td><span id='capacityValue'>0</span>l</td></tr>")).c_str();
-    content_ += String(F("<tr><td align=left>Filled: </td><td><span id='filledpercentValue'>0</span>%</td></tr>")).c_str();
-    content_ += String(F("<tr><td align=left>Sensor Status:</td><td><span id='statusValue'>no response</span></td></tr>")).c_str();
-    content_ += fp_.getHtmlTableEnd().c_str();
-    content_ += fp_.getHtmlFieldsetEnd().c_str();
+    // Footer
+    response_->print(fp_.addNewLine(2));
+    response_->print(fp_.getHtmlTable());
+    response_->print(fp_.getHtmlTableRowText("Go to <a href='config'>configure page</a> to change configuration."));
+    response_->print(fp_.getHtmlTableRowText("Go to <a href='webserial'>sensor monitoring</a> page."));
+    response_->print(fp_.getHtmlTableRowText(fp_.getHtmlVersion(Version)));
+    response_->print(fp_.getHtmlTableEnd());
+    
+    response_->print(fp_.getBodyEnd());
+    response_->print(fp_.getHtmlEnd());
 
-    // Damping Control Section
-    content_ += fp_.getHtmlFieldset("Sensor damping").c_str();
-    content_ += fp_.getHtmlTable().c_str();
-    content_ += String(F("<tr><td align=left>Status:</td><td><span id='dampingStatus'>Damping active</span></td></tr>")).c_str();
-    content_ += String(F("<tr><td colspan='2' align='center'><button id='dampingBtn' class='button' onclick='toggleDamping()'>Pause damping</button></td></tr>")).c_str();
-    content_ += String(F("<tr><td colspan='2' align='left' style='font-size:12px; color:#666;'>Damping will be paused for 15 minutes or can be manually reactivated.</td></tr>")).c_str();
-    content_ += fp_.getHtmlTableEnd().c_str();
-    content_ += fp_.getHtmlFieldsetEnd().c_str();
-
-    content_ += fp_.getHtmlFieldset("Network").c_str();
-    content_ += fp_.getHtmlTable().c_str();
-    content_ += fp_.getHtmlTableRowText("MAC Address:", WiFi.macAddress()).c_str();
-    content_ += fp_.getHtmlTableRowText("IP Address:", WiFi.localIP().toString().c_str()).c_str();
-    content_ += fp_.getHtmlTableEnd().c_str();
-    content_ += fp_.getHtmlFieldsetEnd().c_str();
-
-    content_ += fp_.addNewLine(2).c_str();
-
-    content_ += fp_.getHtmlTable().c_str();
-    content_ += fp_.getHtmlTableRowText("Go to <a href = 'config'>configure page</a> to change configuration.").c_str();
-    content_ += fp_.getHtmlTableRowText("Go to <a href = 'webserial'>sensor monitoring</a> page.").c_str();
-    content_ += fp_.getHtmlTableRowText(fp_.getHtmlVersion(Version)).c_str();
-    content_ += fp_.getHtmlTableEnd().c_str();
-
-    content_ += fp_.getHtmlTableColEnd().c_str();
-    content_ += fp_.getHtmlTableRowEnd().c_str();
-    content_ += fp_.getHtmlTableEnd().c_str();
-    content_ += fp_.getHtmlEnd().c_str();
-
-    AsyncWebServerResponse* response = request->beginChunkedResponse("text/html", [content_](uint8_t* buffer, size_t maxLen, size_t index) -> size_t {
-
-        std::string chunk_ = "";
-        size_t len_ = min(content_.length() - index, maxLen);
-        if (len_ > 0) {
-            chunk_ = content_.substr(index, len_ - 1);
-            chunk_.copy((char*)buffer, chunk_.length());
-        }
-        if (index + len_ <= content_.length())
-            return chunk_.length();
-        else
-            return 0;
-
-        });
-    response->addHeader("Server", "ESP Async Web Server");
-    request->send(response);
+    response_->addHeader("Server", "ESP Async Web Server");
+    request->send(response_);
 }
 
 void convertParams() {
