@@ -13,6 +13,8 @@ const char wifiInitialApPassword[] = "123456789";
 extern void wifiInit();
 extern void wifiLoop();
 
+extern bool ShouldReboot;
+
 static WiFiClient wifiClient;
 extern AsyncIotWebConf iotWebConf;
 

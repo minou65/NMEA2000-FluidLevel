@@ -28,6 +28,35 @@
 // -- Initial name of the Thing. Used e.g. as SSID of the own Access Point.
 const char thingName[] = "NMEA2000-FluidLevel";
 
+const char html_form_end[] PROGMEM = R"=====(
+</br><form action='/reboot' method='get'><button type='submit'>Reboot</button></form>
+</br><form action='/' method='get' style='display:inline;'>
+  <button type='submit'>Home</button>
+  </br>
+</form>
+</br><form action='/post' method='post' style='display:inline;' onsubmit="event.preventDefault(); postReset();">
+  <button type='submit'>Reset to factory defaults</button>
+</form>
+<script>
+function postReset() {
+    fetch('/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'reset=true'
+    })
+    .then(response => {
+        if (response.ok) { 
+            window.location.reload(true);  // Hard reload
+        }
+    })
+    .catch(error => {
+        console.error('Reset fehlgeschlagen:', error);
+        alert('Reset fehlgeschlagen!');
+    });
+}
+</script>
+)=====";
+
 uint8_t APModeOfflineTime = 0;
 Neotimer APModeTimer = Neotimer();
 
@@ -38,6 +67,8 @@ Neotimer DampingPauseTimer = Neotimer(15 * 60 * 1000); // 15 Minuten
 // -- Method declarations.
 void onWebSerialMessage(uint8_t* data, size_t len);
 void handleData(AsyncWebServerRequest* request);
+void handlePost(AsyncWebServerRequest* request);
+void handleReboot(AsyncWebServerRequest* request);
 void handleRoot(AsyncWebServerRequest* request);
 void handleToggleDamping(AsyncWebServerRequest* request);
 
@@ -47,6 +78,7 @@ void convertParams();
 void configSaved();
 
 bool ParamsChanged = true;
+bool ShouldReboot = false;
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
@@ -64,10 +96,8 @@ SensorConfig sensorConfig;
 
 class CustomHtmlFormatProvider : public iotwebconf::HtmlFormatProvider {
 protected:
-    virtual String getFormEnd() {
-        String s_ = HtmlFormatProvider::getFormEnd();
-        s_ += F("</br>Return to <a href='/'>home page</a>.");
-        return s_;
+    String getFormEnd() override {
+        return HtmlFormatProvider::getFormEnd() + String(FPSTR(html_form_end));
     }
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
@@ -195,6 +225,8 @@ void wifiInit() {
         });
 
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* request) { handleData(request); });
+    server.on("/post", HTTP_ANY, [](AsyncWebServerRequest* request) { handlePost(request); });
+    server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest* request) { handleReboot(request); });
     server.on("/toggledamping", HTTP_GET, [](AsyncWebServerRequest* request) { handleToggleDamping(request); });
     
     server.onNotFound([](AsyncWebServerRequest* request) {
@@ -238,8 +270,7 @@ void wifiLoop() {
 
     if (AsyncUpdater.isFinished()) {
         Serial.println(F("Firmware update finished"));
-        delay(1000);
-        ESP.restart();
+        ShouldReboot = true;
     }
 }
 
@@ -255,8 +286,7 @@ void onWebSerialMessage(uint8_t* data, size_t len) {
     cmd_.trim();
 
     if (cmd_.startsWith("reboot")) {
-        WebSerial.println("Rebooting...");
-        ESP.restart();
+        ShouldReboot = true;
     }
     else if (cmd_.startsWith("status")) {
         WebSerial.println("========================================");
@@ -322,6 +352,40 @@ void handleData(AsyncWebServerRequest* request) {
 
     json_ += "}";
     request->send(200, "application/json", json_);
+}
+
+void handlePost(AsyncWebServerRequest* request) {
+    if (request->hasParam("reset", true)) {
+        Serial.println(F("Resetting to defaults..."));
+
+        Config.applyDefaultValue();
+        tank.applyDefaultValue();
+        sensorConfig.applyDefaultValue();
+
+        iotWebConf.saveConfig();
+
+        request->send(200, "text/plain", "OK");
+    }
+    else {
+        request->send(400, "text/plain", "Bad Request");
+    }
+}
+
+void handleReboot(AsyncWebServerRequest* request) {
+    AsyncWebServerResponse* response_ = request->beginResponse(200, "text/html",
+        "<html>"
+        "<head>"
+        "<meta http-equiv=\"refresh\" content=\"15; url=/\">"
+        "<title>Rebooting...</title>"
+        "</head>"
+        "<body>"
+        "Please wait while the device is rebooting...<br>"
+        "You will be redirected to the homepage shortly."
+        "</body>"
+        "</html>");
+    request->client()->setNoDelay(true); // Disable Nagle's algorithm so the client gets the response immediately
+    request->send(response_);
+    ShouldReboot = true;
 }
 
 void handleRoot(AsyncWebServerRequest* request) {
