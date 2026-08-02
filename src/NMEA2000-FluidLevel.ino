@@ -687,5 +687,11 @@ void loop() {
         Serial.read();
     }
 
+    if (ShouldReboot) {
+        Serial.println("Rebooting...");
+        delay(1000);
+        ESP.restart();
+	}
+
     esp_task_wdt_reset();
 }
