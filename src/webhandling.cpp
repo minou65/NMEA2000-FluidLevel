@@ -57,6 +57,10 @@ function postReset() {
 </script>
 )=====";
 
+const char html_end_template[] PROGMEM = R"=====(
+</div></body></html>
+)=====";
+
 uint8_t APModeOfflineTime = 0;
 Neotimer APModeTimer = Neotimer();
 
@@ -85,7 +89,7 @@ AsyncWebServer server(80);
 AsyncWebServerWrapper asyncWebServerWrapper(&server);
 AsyncUpdateServer AsyncUpdater;
 
-AsyncIotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
+AsyncIotWebConfTab iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
 
 char APModeOfflineValue[STRING_LEN];
 iotwebconf::NumberParameter APModeOfflineParam = iotwebconf::NumberParameter("AP offline mode after (minutes)", "APModeOffline", APModeOfflineValue, NUMBER_LEN, "0", "0..30", "min='0' max='30', step='1'");
@@ -94,13 +98,18 @@ NMEAConfig Config = NMEAConfig();
 Tank tank = Tank("tank", "Tank configuration");
 SensorConfig sensorConfig;
 
-class CustomHtmlFormatProvider : public iotwebconf::HtmlFormatProvider {
+class CustomHtmlFormatProvider : public AsyncTabHtmlFormatProvider {
+public:
+    CustomHtmlFormatProvider(std::vector<AsyncTabInfo>* tabs, int minWidth = 500, int maxWidth = 600)
+        : AsyncTabHtmlFormatProvider(tabs, minWidth, maxWidth) {
+    }
+
 protected:
     String getFormEnd() override {
-        return HtmlFormatProvider::getFormEnd() + String(FPSTR(html_form_end));
+        return AsyncTabHtmlFormatProvider::getFormEnd() + String(FPSTR(html_form_end));
     }
 };
-CustomHtmlFormatProvider customHtmlFormatProvider;
+CustomHtmlFormatProvider* customHtmlFormatProvider = nullptr;
 
 class MyHtmlRootFormatProvider : public TabHtmlRootFormatProvider {
 public:
@@ -170,13 +179,23 @@ void wifiInit() {
 
     iotWebConf.setStatusPin(STATUS_PIN, ON_LEVEL);
     iotWebConf.setConfigPin(CONFIG_PIN);
-    iotWebConf.setHtmlFormatProvider(&customHtmlFormatProvider);
 
-    iotWebConf.addParameterGroup(&Config);
-    iotWebConf.addParameterGroup(&tank);
-    iotWebConf.addParameterGroup(&sensorConfig);
+    // === TABS KONFIGURIEREN ===
+    // System Tab soll an letzter Stelle sein
+    iotWebConf.setSystemTabPosition(-1);  // -1 = letzte Position
+    iotWebConf.setSystemTabName("System");
 
+    // Parameter Groups zu Tabs hinzufügen
+    iotWebConf.addParameterGroup(&tank, "Tank");           // Tab "Tank" mit Tank Config
+    iotWebConf.addParameterGroup(&sensorConfig, "Tank");   // Sensor Calibration auch in "Tank"
+    iotWebConf.addParameterGroup(&Config, "NMEA");         // Tab "NMEA"
+
+    // System Parameter (wird automatisch im System Tab angezeigt)
     iotWebConf.addSystemParameter(&APModeOfflineParam);
+
+    auto customProvider = new CustomHtmlFormatProvider(iotWebConf.getTabsVector());
+    customProvider->setContainerWidth(700, 700); // Set a fixed width for the configuration portal
+    iotWebConf.setHtmlFormatProvider(customProvider);
 
     iotWebConf.setupUpdateServer(
         [](const char* updatePath) { AsyncUpdater.setup(&server, updatePath); },

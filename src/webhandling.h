@@ -4,7 +4,7 @@
 #define _WEBHANDLING_h
 
 #include <Arduino.h>
-#include <IotWebConfAsync.h>
+#include <IotWebConfAsyncTab.h>
 #include <WebSerial.h>
 
 // -- Initial password to connect to the Thing, when it creates an own Access Point.
@@ -16,7 +16,7 @@ extern void wifiLoop();
 extern bool ShouldReboot;
 
 static WiFiClient wifiClient;
-extern AsyncIotWebConf iotWebConf;
+extern AsyncIotWebConfTab iotWebConf;
 
 class NMEAConfig : public iotwebconf::ParameterGroup {
 public:
