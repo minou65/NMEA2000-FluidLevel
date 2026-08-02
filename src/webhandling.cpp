@@ -219,29 +219,7 @@ void wifiInit() {
         }
     );
 
-    server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse* response = request->beginResponse_P(
-            200,
-            "image/x-icon",
-            favicon_ico,
-            sizeof(favicon_ico)
-        );
-        response->addHeader("Cache-Control", "public, max-age=604800"); // 7 days
-        response->addHeader("ETag", "\"favicon-v1\"");
-        request->send(response);
-        });
-
-    server.on("/apple-touch-icon.png", HTTP_GET, [](AsyncWebServerRequest* request) {
-        AsyncWebServerResponse* response = request->beginResponse_P(
-            200,
-            "image/png",
-            favicon_ico,
-            sizeof(favicon_ico)
-        );
-        response->addHeader("Cache-Control", "public, max-age=604800"); // 7 days
-        response->addHeader("ETag", "\"favicon-v1\"");
-        request->send(response);
-        });
+    IconHandler::registerHandlers(&server, favicon_ico, sizeof(favicon_ico));
 
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest* request) { handleData(request); });
     server.on("/post", HTTP_ANY, [](AsyncWebServerRequest* request) { handlePost(request); });
@@ -463,8 +441,7 @@ void handleRoot(AsyncWebServerRequest* request) {
 
     // === HTML Output ===
     response_->print(fp_.getHtmlHead(iotWebConf.getThingName()));
-    response_->print(F("<link rel=\"icon\" type=\"image/png\" sizes=\"96x96\" href=\"/favicon.ico\">\n"));
-    response_->print(F("<link rel=\"apple-touch-icon\" sizes=\"96x96\" href=\"/apple-touch-icon.png\">\n"));
+    response_->print(fp_.getIconLinks());
     response_->print(fp_.getHtmlHeadEnd());
     response_->print(fp_.getHtmlTabs());
 
