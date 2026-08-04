@@ -269,28 +269,32 @@ void CheckN2kSourceAddressChange() {
         return;
     }
 
-	uint8_t newSource = NMEA2000.GetN2kSource();
-    Serial.printf("NMEA2000 source address changed to %u\n", newSource);
-    Preferences prefs;
-    prefs.begin("n2k", false);
-    prefs.putUChar("N2KSource", newSource);
-	prefs.end();
+    uint8_t newSource_ = NMEA2000.GetN2kSource();
+    Serial.printf("NMEA2000 source address changed to %u\n", newSource_);
+    
+    Preferences prefs_;
+    prefs_.begin("n2k", false);
+    prefs_.putUChar("N2KSource", newSource_);
+    prefs_.end();
+    
+    // Update NMEAConfig in Web UI
+    Config.SetSource(newSource_);
 }
 
 // ============================================================================
 // SETUP
 // ============================================================================
 void setup() {
-    uint8_t chipid[6];
-    uint32_t id = 0;
+    uint8_t chipid_[6];
+    uint32_t id_ = 0;
 
-    esp_efuse_mac_get_default(chipid);
-    for (int i = 0; i < 6; i++) id += (chipid[i] << (7 * i));
+    esp_efuse_mac_get_default(chipid_);
+    for (int i_ = 0; i_ < 6; i_++) id_ += (chipid_[i_] << (7 * i_));
 
     Serial.begin(115200);
     while (!Serial) {
-        static unsigned long startWait = millis();
-        if (millis() - startWait > 3000) break;
+        static unsigned long startWait_ = millis();
+        if (millis() - startWait_ > 3000) break;
     }
 
     Serial.println("\n========================================");
@@ -315,8 +319,48 @@ void setup() {
     Serial.printf("Reboot count: %d\n", RebootManager::getRebootCount());
     Serial.printf("Last reboot reason: %s\n", RebootManager::getLastRebootReasonText().c_str());
 
+    randomSeed(esp_random());
+
+    // ===============================================================
+    // MAC-basierte eindeutige Adressierung (Bereich 20-50)
+    // ===============================================================
+    uint8_t mac_[6];
+    esp_efuse_mac_get_default(mac_);
+    
+    // Verwendet MAC[4] und MAC[5] für maximale Variation im Bereich 20-50
+    uint8_t baseAddress_ = 20 + ((mac_[4] + mac_[5]) % 31);  // Ergibt 20-50
+    
+    Serial.printf("Device MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", 
+        mac_[0], mac_[1], mac_[2], mac_[3], mac_[4], mac_[5]);
+    Serial.printf("Calculated base N2K address: %u (range 20-50, based on MAC[4]+MAC[5])\n", baseAddress_);
+    
+    // MAC-basierter Startup-Delay (0-5100ms)
+    uint32_t randomDelay_ = (mac_[5] * 20);
+    Serial.printf("Startup delay: %lu ms (prevents address collision)\n", randomDelay_);
+    delay(randomDelay_);
+
     Serial.println("\nInitializing sensor...");
     initSensor();
+
+    // Load N2K source address from Preferences
+    Preferences prefs_;
+    prefs_.begin("n2k", false);  // read-write
+    
+    uint8_t val_ = prefs_.getUChar("N2KSource", 255);  // 255 = nicht gesetzt
+    uint8_t source_;
+    
+    if (val_ == 255) {
+        // Erste Inbetriebnahme: MAC-basierte Adresse speichern
+        source_ = baseAddress_;
+        prefs_.putUChar("N2KSource", baseAddress_);
+        Serial.printf("First boot: Set N2KSource = %u (MAC-based)\n", baseAddress_);
+    } else {
+        source_ = val_;
+    }
+    
+    prefs_.end();
+    
+    Serial.printf("Using N2K address: %u\n", source_);
 
     Serial.println("\nInitializing WiFi...");
     wifiInit();
@@ -325,23 +369,23 @@ void setup() {
     Serial.println("Setting up NMEA2000...");
     Serial.println("========================================");
 
-    // load N2K source address from Preferences if available
-    Preferences prefs_;
-    prefs_.begin("n2k", true); // read-only
-    uint8_t source_ = prefs_.getUChar("N2KSource", 22); // fallback: default 22
-    prefs_.end();
-
-    Serial.printf("Requested N2K Source Address: %u\n", source_);
-
     NMEA2000.SetN2kCANMsgBufSize(8);
     NMEA2000.SetN2kCANReceiveFrameBufSize(150);
     NMEA2000.SetN2kCANSendFrameBufSize(150);
     Serial.println("Buffer sizes configured");
 
+    // Kurzer, eindeutiger Device Model ID basierend auf MAC
+    char deviceModelId_[16];
+    snprintf(deviceModelId_, sizeof(deviceModelId_), "FL-%02X", mac_[5]);
+    
+    // Kurzer Product Name
+    char productName_[32];
+    snprintf(productName_, sizeof(productName_), "Level-%02X", mac_[5]);
+
     NMEA2000.SetProductInformation(
         "1",
         100,
-        "Resistive Level Sensor 240-33",
+        productName_,
         Version,
         Version,
         1,
@@ -351,7 +395,7 @@ void setup() {
     Serial.println("Product information set");
 
     NMEA2000.SetDeviceInformation(
-        id,
+        id_,
         150,
         75,
         2040
@@ -359,7 +403,7 @@ void setup() {
     Serial.println("Device information set");
 
     NMEA2000.SetConfigurationInformation(
-        String(id).c_str(),
+        deviceModelId_,
         iotWebConf.getThingName(),
         ""
     );
@@ -370,14 +414,23 @@ void setup() {
     NMEA2000.SetN2kSource(source_);
 
     NMEA2000.ExtendTransmitMessages(TransmitMessages);
-//    NMEA2000.ExtendReceiveMessages(ReceiveMessages);
+    NMEA2000.ExtendReceiveMessages(ReceiveMessages);
 
-//    NMEA2000.SetMsgHandler(handleN2kMessages);
+    NMEA2000.SetMsgHandler(handleN2kMessages);
     NMEA2000.SetOnOpen(OnN2kOpen);
     
+    Serial.println("Opening NMEA2000...");
     NMEA2000.Open();
 
     esp_task_wdt_add(NULL);
+
+    Serial.println("\n========================================");
+    Serial.println("NMEA2000 started");
+    Serial.printf("Base address: %u, Using address: %u\n", 
+        baseAddress_, source_);
+    Serial.println("Listening for GPS time on NMEA2000 bus");
+    Serial.println("Setup complete");
+    Serial.println("========================================\n");
 }
 
 // ============================================================================
