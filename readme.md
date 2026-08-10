@@ -80,9 +80,9 @@ Populate the following components:
 | R1 | 270R | R-EU_R0805 | R0805 |
 | X1 |  | AK500/3 | AK500/3 |
 | X2 |  | AK500/2 | AK500/2 |
-| X3 | Sender 220-33 Ohm | 22-23-2031 | 22-23-2031 |
+| X3 | Sender 240-33 Ohm | 22-23-2031 | 22-23-2031 |
 
-Remark: The sender (220-33 Ohm) must be connected to pins X3-2 and X3-3.
+Remark: The sender (240-33 Ohm) must be connected to pins X3-2 and X3-3.
 
 Sensor photos:
 
