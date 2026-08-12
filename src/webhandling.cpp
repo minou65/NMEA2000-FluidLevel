@@ -391,7 +391,7 @@ void handleRoot(AsyncWebServerRequest* request) {
         return;
     }
 
-    AsyncResponseStream* response_ = request->beginResponseStream("text/html", 2048);
+    AsyncResponseStream* response_ = request->beginResponseStream("text/html");
     MyHtmlRootFormatProvider fp_;
 
     // === Create 3 Tabs ===
@@ -399,51 +399,72 @@ void handleRoot(AsyncWebServerRequest* request) {
     fp_.addTab("Sensor", "sensor");
     fp_.addTab("System", "system");
 
-    // === TAB 1: Tank Status ===
-    String tankTab_ = "";
-    tankTab_ += F("<fieldset align=left style=\"border: 1px solid\"><table border=\"0\" align=\"center\" width=\"100%\">");
-    tankTab_ += F("<tr><td align=\"left\">RSSI:</td><td align=\"right\"><span id=\"RSSIValue\">no data</span></td></tr></table></fieldset>");
-    
-    tankTab_ += fp_.getHtmlFieldset(String(tank.TypeName()) + " tank");
-    tankTab_ += fp_.getHtmlTable();
-    tankTab_ += fp_.getHtmlTableRow();
-    tankTab_ += fp_.getHtmlTableCol();
-    tankTab_ += F("<progress id=\"tankValue\" style=\"height:50px\" max=\"100\" value=\"0\">0%</progress>\n");
-    tankTab_ += fp_.getHtmlTableColEnd();
-    tankTab_ += fp_.getHtmlTableRowEnd();
-    tankTab_ += F("<tr><td align=left>Volume: </td><td><span id='capacityValue'>0</span>l</td></tr>");
-    tankTab_ += F("<tr><td align=left>Filled: </td><td><span id='filledpercentValue'>0</span>%</td></tr>");
-    tankTab_ += F("<tr><td align=left>Sensor Status:</td><td><span id='statusValue'>no response</span></td></tr>");
-    tankTab_ += fp_.getHtmlTableEnd();
-    tankTab_ += fp_.getHtmlFieldsetEnd();
-    fp_.addString(tankTab_, "tank");
-
-    // === TAB 2: Sensor Damping Control ===
-    String sensorTab_ = "";
-    sensorTab_ += fp_.getHtmlFieldset("Sensor damping");
-    sensorTab_ += fp_.getHtmlTable();
-    sensorTab_ += F("<tr><td align=left>Status:</td><td><span id='dampingStatus'>Damping active</span></td></tr>");
-    sensorTab_ += F("<tr><td colspan='2' align='center'><button id='dampingBtn' class='button' onclick='toggleDamping()'>Pause damping</button></td></tr>");
-    sensorTab_ += F("<tr><td colspan='2' align='left' style='font-size:12px; color:#666;'>Damping will be paused for 15 minutes or can be manually reactivated.</td></tr>");
-    sensorTab_ += fp_.getHtmlTableEnd();
-    sensorTab_ += fp_.getHtmlFieldsetEnd();
-    fp_.addString(sensorTab_, "sensor");
-
-    // === TAB 3: System Info ===
-    String systemTab_ = "";
-    systemTab_ += fp_.getHtmlFieldset("Network");
-    systemTab_ += fp_.getHtmlTable();
-    systemTab_ += fp_.getHtmlTableRowText("MAC Address:", WiFi.macAddress());
-    systemTab_ += fp_.getHtmlTableRowText("IP Address:", WiFi.localIP().toString());
-    systemTab_ += fp_.getHtmlTableEnd();
-    systemTab_ += fp_.getHtmlFieldsetEnd();
-    fp_.addString(systemTab_, "system");
-
-    // === HTML Output ===
+    // Header
     response_->print(fp_.getHtmlHead(iotWebConf.getThingName()));
     response_->print(fp_.getIconLinks());
+    response_->print(fp_.getHtmlStyle());
     response_->print(fp_.getHtmlHeadEnd());
-    response_->print(fp_.getHtmlTabs());
+    response_->print(fp_.getHtmlScript());
+    response_->print(fp_.getHtmlTabButtons());
+
+    // === TAB 1: Tank Status
+    response_->print(fp_.getHtmlTabContentStart("tank"));
+    response_->print(F("<fieldset align=left style=\"border: 1px solid\"><table border=\"0\" align=\"center\" width=\"100%\">"));
+    response_->print(F("<tr><td align=\"left\">RSSI:</td><td align=\"right\"><span id=\"RSSIValue\">no data</span></td></tr></table></fieldset>"));
+
+    response_->print(fp_.getHtmlFieldset(String(tank.TypeName()) + " tank"));
+    response_->print(fp_.getHtmlTable());
+    response_->print(fp_.getHtmlTableRow());
+    response_->print(fp_.getHtmlTableCol());
+    response_->print(F("<progress id=\"tankValue\" style=\"height:50px\" max=\"100\" value=\"0\">0%</progress>\n"));
+    response_->print(fp_.getHtmlTableColEnd());
+    response_->print(fp_.getHtmlTableRowEnd());
+    response_->print(F("<tr><td align=left>Volume: </td><td><span id='capacityValue'>0</span>l</td></tr>"));
+    response_->print(F("<tr><td align=left>Filled: </td><td><span id='filledpercentValue'>0</span>%</td></tr>"));
+    response_->print(F("<tr><td align=left>Sensor Status:</td><td><span id='statusValue'>no response</span></td></tr>"));
+    response_->print(fp_.getHtmlTableEnd());
+    response_->print(fp_.getHtmlFieldsetEnd());
+    response_->print(fp_.getHtmlTabContentEnd());
+
+    // === TAB 2: Sensor Damping Control
+    response_->print(fp_.getHtmlTabContentStart("sensor"));
+    response_->print(fp_.getHtmlFieldset("Sensor damping"));
+    response_->print(fp_.getHtmlTable());
+    response_->print(F("<tr><td align=left>Status:</td><td><span id='dampingStatus'>Damping active</span></td></tr>"));
+    response_->print(F("<tr><td colspan='2' align='center'><button id='dampingBtn' class='button' onclick='toggleDamping()'>Pause damping</button></td></tr>"));
+    response_->print(F("<tr><td colspan='2' align='left' style='font-size:12px; color:#666;'>Damping will be paused for 15 minutes or can be manually reactivated.</td></tr>"));
+    response_->print(fp_.getHtmlTableEnd());
+    response_->print(fp_.getHtmlFieldsetEnd());
+    response_->print(fp_.getHtmlTabContentEnd());
+
+    // === TAB 3: System Info
+    response_->print(fp_.getHtmlTabContentStart("system"));
+    response_->print(fp_.getHtmlFieldset("Network"));
+    response_->print(fp_.getHtmlTable());
+
+    uint64_t chipid_ = ESP.getEfuseMac();
+    char macStr_[18];
+    snprintf(macStr_, sizeof(macStr_), "%02X:%02X:%02X:%02X:%02X:%02X",
+        (uint8_t)(chipid_ >> 40), (uint8_t)(chipid_ >> 32),
+        (uint8_t)(chipid_ >> 24), (uint8_t)(chipid_ >> 16),
+        (uint8_t)(chipid_ >> 8), (uint8_t)(chipid_));
+    response_->print(fp_.getHtmlTableRowText("MAC Address:", String(macStr_)));
+
+    String ipAddress_;
+    if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+        ipAddress_ = WiFi.softAPIP().toString();
+    }
+    else {
+        ipAddress_ = WiFi.localIP().toString();
+    }
+    if (ipAddress_ == "0.0.0.0" || ipAddress_.isEmpty()) {
+        ipAddress_ = "Not connected";
+    }
+    response_->print(fp_.getHtmlTableRowText("IP Address:", ipAddress_));
+
+    response_->print(fp_.getHtmlTableEnd());
+    response_->print(fp_.getHtmlFieldsetEnd());
+    response_->print(fp_.getHtmlTabContentEnd());
 
     // Footer
     response_->print(fp_.addNewLine(2));
@@ -452,7 +473,7 @@ void handleRoot(AsyncWebServerRequest* request) {
     response_->print(fp_.getHtmlTableRowText("Go to <a href='webserial'>sensor monitoring</a> page."));
     response_->print(fp_.getHtmlTableRowText(fp_.getHtmlVersion(Version)));
     response_->print(fp_.getHtmlTableEnd());
-    
+
     response_->print(fp_.getBodyEnd());
     response_->print(fp_.getHtmlEnd());
 
