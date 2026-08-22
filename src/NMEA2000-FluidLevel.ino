@@ -32,9 +32,11 @@
 #include <Preferences.h>
 #include <esp_task_wdt.h>
 #include <RebootManager.h>
+#include <EventLogger.h>
 #include <time.h>
 #include <sys/time.h>
 #include <driver/twai.h>
+#
 
 
 
@@ -234,27 +236,27 @@ void setup() {
         if (millis() - startWait_ > 3000) break;
     }
 
-    Serial.println("\n========================================");
-    Serial.println("Hardware Configuration Check");
-    Serial.println("========================================");
-    Serial.printf("Board: %s\n", BOARD_NAME);
-    Serial.printf("CAN TX Pin: GPIO%d\n", ESP32_CAN_TX_PIN);
-    Serial.printf("CAN RX Pin: GPIO%d\n", ESP32_CAN_RX_PIN);
-    Serial.printf("Sensor Pin: GPIO%d\n", SENSOR_PIN);
-    Serial.println("CAN Transceiver: MCP2562");
-    Serial.println("========================================");
+    eventLogger.log(F("========================================"));
+    eventLogger.log(F("Hardware Configuration Check"));
+    eventLogger.log(F("========================================"));
+    eventLogger.logf("Board: %s", BOARD_NAME);
+    eventLogger.logf("CAN TX Pin: GPIO%d", ESP32_CAN_TX_PIN);
+    eventLogger.logf("CAN RX Pin: GPIO%d", ESP32_CAN_RX_PIN);
+    eventLogger.logf("Sensor Pin: GPIO%d", SENSOR_PIN);
+    eventLogger.log(F("CAN Transceiver: MCP2562"));
+    eventLogger.log(F("========================================"));
 
-    Serial.println("========================================");
-    Serial.println("NMEA2000 Resistive Fluid Level Sensor");
-    Serial.println("========================================");
-    Serial.printf("Firmware version: %s\n", Version);
-    Serial.println("Sensor type: Resistive (240-33 Ohm)");
-    Serial.printf("Sensor pin: GPIO_%d\n", SENSOR_PIN);
-    Serial.println("========================================\n");
+    eventLogger.log(F("========================================"));
+    eventLogger.log(F("NMEA2000 Resistive Fluid Level Sensor"));
+    eventLogger.log(F("========================================"));
+    eventLogger.logf("Firmware version: %s", Version);
+    eventLogger.log(F("Sensor type: Resistive (240-33 Ohm)"));
+    eventLogger.logf("Sensor pin: GPIO_%d", SENSOR_PIN);
+    eventLogger.log(F("========================================"));
 
     RebootManager::begin();
-    Serial.printf("Reboot count: %d\n", RebootManager::getRebootCount());
-    Serial.printf("Last reboot reason: %s\n", RebootManager::getLastRebootReasonText().c_str());
+    eventLogger.logf("Reboot count: %d", RebootManager::getRebootCount());
+    eventLogger.logf("Last reboot reason: %s", RebootManager::getLastRebootReasonText().c_str());
 
     randomSeed(esp_random());
 
@@ -267,54 +269,55 @@ void setup() {
     // Verwendet MAC[4] und MAC[5] für maximale Variation im Bereich 20-50
     uint8_t baseAddress_ = 20 + ((mac_[4] + mac_[5]) % 31);  // Ergibt 20-50
     
-    Serial.printf("Device MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", 
+    eventLogger.logf("Device MAC: %02X:%02X:%02X:%02X:%02X:%02X",
         mac_[0], mac_[1], mac_[2], mac_[3], mac_[4], mac_[5]);
-    Serial.printf("Calculated base N2K address: %u (range 20-50, based on MAC[4]+MAC[5])\n", baseAddress_);
-    
+    eventLogger.logf("Calculated base N2K address: %u (range 20-50, based on MAC[4]+MAC[5])", baseAddress_);
+
     // MAC-basierter Startup-Delay (0-5100ms)
     uint32_t randomDelay_ = (mac_[5] * 20);
-    Serial.printf("Startup delay: %lu ms (prevents address collision)\n", randomDelay_);
+    eventLogger.logf("Startup delay: %lu ms (prevents address collision)", randomDelay_);
     delay(randomDelay_);
 
-    Serial.println("\nInitializing sensor...");
+    eventLogger.log(F("Initializing sensor..."));
     initSensor();
 
     // Load N2K source address from Preferences
     Preferences prefs_;
     prefs_.begin("n2k", false);  // read-write
-    
+
     uint8_t val_ = prefs_.getUChar("N2KSource", 255);  // 255 = nicht gesetzt
     uint8_t source_;
-    
+
     if (val_ == 255) {
         // Erste Inbetriebnahme: MAC-basierte Adresse speichern
         source_ = baseAddress_;
         prefs_.putUChar("N2KSource", baseAddress_);
-        Serial.printf("First boot: Set N2KSource = %u (MAC-based)\n", baseAddress_);
-    } else {
+        eventLogger.logf("First boot: Set N2KSource = %u (MAC-based)", baseAddress_);
+    }
+    else {
         source_ = val_;
     }
-    
-    prefs_.end();
-    
-    Serial.printf("Using N2K address: %u\n", source_);
 
-    Serial.println("\nInitializing WiFi...");
+    prefs_.end();
+
+    eventLogger.logf("Using N2K address: %u", source_);
+
+    eventLogger.log(F("Initializing WiFi..."));
     wifiInit();
 
-    Serial.println("\n========================================");
-    Serial.println("Setting up NMEA2000...");
-    Serial.println("========================================");
+    eventLogger.log(F("========================================"));
+    eventLogger.log(F("Setting up NMEA2000..."));
+    eventLogger.log(F("========================================"));
 
     NMEA2000.SetN2kCANMsgBufSize(8);
     NMEA2000.SetN2kCANReceiveFrameBufSize(150);
     NMEA2000.SetN2kCANSendFrameBufSize(150);
-    Serial.println("Buffer sizes configured");
+    eventLogger.log(F("Buffer sizes configured"));
 
     // Kurzer, eindeutiger Device Model ID basierend auf MAC
     char deviceModelId_[16];
     snprintf(deviceModelId_, sizeof(deviceModelId_), "FL-%02X", mac_[5]);
-    
+
     // Kurzer Product Name
     char productName_[32];
     snprintf(productName_, sizeof(productName_), "Level-%02X", mac_[5]);
@@ -329,7 +332,7 @@ void setup() {
         0xffff,
         0xff
     );
-    Serial.println("Product information set");
+    eventLogger.log(F("Product information set"));
 
     NMEA2000.SetDeviceInformation(
         id_,
@@ -337,14 +340,14 @@ void setup() {
         75,
         2040
     );
-    Serial.println("Device information set");
+    eventLogger.log(F("Device information set"));
 
     NMEA2000.SetConfigurationInformation(
         deviceModelId_,
         iotWebConf.getThingName(),
         ""
     );
-    Serial.println("Configuration information set");
+    eventLogger.log(F("Configuration information set"));
 
     NMEA2000.EnableForward(false);
     NMEA2000.SetMode(tNMEA2000::N2km_NodeOnly);
@@ -355,19 +358,19 @@ void setup() {
 
     NMEA2000.SetMsgHandler(handleN2kMessages);
     NMEA2000.SetOnOpen(OnN2kOpen);
-    
-    Serial.println("Opening NMEA2000...");
+
+    eventLogger.log(F("Opening NMEA2000..."));
     NMEA2000.Open();
 
     esp_task_wdt_add(NULL);
 
-    Serial.println("\n========================================");
-    Serial.println("NMEA2000 started");
-    Serial.printf("Base address: %u, Using address: %u\n", 
+    eventLogger.log(F("========================================"));
+    eventLogger.log(F("NMEA2000 started"));
+    eventLogger.logf("Base address: %u, Using address: %u",
         baseAddress_, source_);
-    Serial.println("Listening for GPS time on NMEA2000 bus");
-    Serial.println("Setup complete");
-    Serial.println("========================================\n");
+    eventLogger.log(F("Listening for GPS time on NMEA2000 bus"));
+    eventLogger.log(F("Setup complete"));
+    eventLogger.log(F("========================================"));
 }
 
 // ============================================================================
@@ -378,31 +381,31 @@ void setup() {
  * Initialize ADC for resistive sensor
  */
 void initSensor() {
-    Serial.println("  Configuring ADC...");
+    eventLogger.log(F("  Configuring ADC..."));
     pinMode(SENSOR_PIN, INPUT);
     analogSetAttenuation(ADC_11db);
     analogReadResolution(12);
 
-    Serial.println("  Taking test reading...");
+    eventLogger.log(F("  Taking test reading..."));
     float testResistance_ = readResistance();
 
-    Serial.printf("  Test resistance: %.1f Ohm\n", testResistance_);
+    eventLogger.logf("  Test resistance: %.1f Ohm", testResistance_);
 
     if (testResistance_ >= RESISTANCE_MIN && testResistance_ <= RESISTANCE_MAX) {
         SensorStatus = "Ok";
-        Serial.printf("  Sensor OK: %.1f Ohm\n", testResistance_);
-        Serial.printf("  Fill level: %.1f%%\n", calculateFillLevel(testResistance_));
+        eventLogger.logf("  Sensor OK: %.1f Ohm", testResistance_);
+        eventLogger.logf("  Fill level: %.1f%%", calculateFillLevel(testResistance_));
     }
     else if (testResistance_ < RESISTANCE_MIN) {
         SensorStatus = "Short circuit";
-        Serial.println("  WARNING: Short circuit detected!");
+        eventLogger.log(F("  WARNING: Short circuit detected!"));
     }
     else {
         SensorStatus = "Open circuit";
-        Serial.println("  WARNING: Open circuit detected!");
+        eventLogger.log(F("  WARNING: Open circuit detected!"));
     }
 
-    Serial.println("Sensor initialization complete");
+    eventLogger.log(F("Sensor initialization complete"));
 }
 
 /**
@@ -520,7 +523,7 @@ String getCurrentTime() {
 void MeasureFillLevel() {
     if (SensorStatus != "Ok") {
         if (debugMode) {
-            WebSerial.printf("%s : Sensor fault: %s\n", getCurrentTime().c_str(), SensorStatus.c_str());
+            eventLogger.logf("%s : Sensor fault: %s", getCurrentTime().c_str(), SensorStatus.c_str());
         }
         return;
     }
@@ -532,7 +535,7 @@ void MeasureFillLevel() {
     if (resistance_ < RESISTANCE_MIN) {
         SensorStatus = "Short circuit";
         if (debugMode) {
-            Serial.printf("%s : Short circuit detected (%.1f Ohm)\n", getCurrentTime().c_str(), resistance_);
+            eventLogger.logf("%s : Short circuit detected (%.1f Ohm)", getCurrentTime().c_str(), resistance_);
         }
         gAverageFillLevel.pushOverwrite(0.0f);
         return;
@@ -541,7 +544,7 @@ void MeasureFillLevel() {
     if (resistance_ > RESISTANCE_MAX) {
         SensorStatus = "Open circuit";
         if (debugMode) {
-            Serial.printf("%s : Open circuit detected (%.1f Ohm)\n", getCurrentTime().c_str(), resistance_);
+            eventLogger.logf("%s : Open circuit detected (%.1f Ohm)", getCurrentTime().c_str(), resistance_);
         }
         gAverageFillLevel.pushOverwrite(0.0f);
         return;
@@ -551,7 +554,7 @@ void MeasureFillLevel() {
     if (SensorStatus != "Ok") {
         SensorStatus = "Ok";
         if (debugMode) {
-            Serial.println("Sensor recovered");
+            eventLogger.log(F("Sensor recovered"));
         }
     }
 
@@ -566,18 +569,15 @@ void MeasureFillLevel() {
 
     // Debug output (only if debugMode is enabled)
     if (debugMode) {
-        Serial.printf("%s : Resistance: %.1f Ohm | Fill: %.1f%% | Avg: %.1f%%\n",
+        eventLogger.logf("%s : Resistance: %.1f Ohm | Fill: %.1f%% | Avg: %.1f%%",
             getCurrentTime().c_str(), resistance_, fillLevel_, avgFillLevel_);
     }
-
-    WebSerial.printf("%s : Resistance: %.1f Ohm | Fill: %.1f%% | Avg: %.1f%%\n",
-        getCurrentTime().c_str(), resistance_, fillLevel_, avgFillLevel_);
 
     // Detect fast changes (>10% threshold)
     float threshold_ = 10.0f;
     if (abs(fillLevel_ - avgFillLevel_) > threshold_) {
         if (debugMode) {
-            Serial.printf("Fast change detected: %.1f%% -> %.1f%%\n", avgFillLevel_, fillLevel_);
+            eventLogger.logf("Fast change detected: %.1f%% -> %.1f%%", avgFillLevel_, fillLevel_);
         }
         // Reset buffer with new value
         for (int i_ = 0; i_ < TANK_RINGBUF_SIZE; i_++) {
@@ -608,10 +608,10 @@ void SendN2kFluidLevel(void) {
 
     // DEBUG: Print tank info
     if (debugMode) {
-        Serial.printf("DEBUG - Tank Capacity: %.1fL\n", tank.Capacity());
-        Serial.printf("DEBUG - Tank Type: %d\n", tank.Type());
-        Serial.printf("DEBUG - Instance: %d\n", Config.Instance());
-        Serial.printf("DEBUG - Fill Level: %.1f%%\n", fillLevel_);
+        eventLogger.logf("DEBUG - Tank Capacity: %.1fL", tank.Capacity());
+        eventLogger.logf("DEBUG - Tank Type: %d", tank.Type());
+        eventLogger.logf("DEBUG - Instance: %d", Config.Instance());
+        eventLogger.logf("DEBUG - Fill Level: %.1f%%", fillLevel_);
     }
 
     // Create and send message
@@ -624,21 +624,21 @@ void SendN2kFluidLevel(void) {
     if (debugMode) {
         if (success) {
             if (fillLevel_ == N2kDoubleNA) {
-                Serial.println("Sent NMEA2000: Level unavailable");
+                eventLogger.log(F("Sent NMEA2000: Level unavailable"));
             }
             else {
                 float volumeLiters = fillLevel_ * tank.Capacity() / 100.0f;
-                Serial.printf("Sent NMEA2000: %.1f%% (%.1fL / %.1fL)\n",
+                eventLogger.logf("Sent NMEA2000: %.1f%% (%.1fL / %.1fL)",
                     fillLevel_, volumeLiters, tank.Capacity());
 
                 // WARNING if capacity is zero
                 if (tank.Capacity() <= 0.0f) {
-                    Serial.println("WARNING: Tank capacity is zero! Check configuration.");
+                    eventLogger.log(F("WARNING: Tank capacity is zero! Check configuration."));
                 }
             }
         }
         else {
-            Serial.println("Failed to send NMEA2000 message!");
+            eventLogger.log(F("Failed to send NMEA2000 message!"));
         }
     }
 }
@@ -667,9 +667,9 @@ void loop() {
         ParamsChanged = false;
         NMEA2000.SetInstallationDescription1(iotWebConf.getThingName());
     }
-    
+
     if (TimeSet && (millis() - LastTimeUpdate > 3600000)) {
-        Serial.println("Warning: No time update received for 1 hour");
+        eventLogger.log(F("Warning: No time update received for 1 hour"));
         TimeSet = false;
     }
 
@@ -678,10 +678,10 @@ void loop() {
     }
 
     if (ShouldReboot) {
-        Serial.println("Rebooting...");
+        eventLogger.log(F("Rebooting..."));
         delay(1000);
         ESP.restart();
-	}
+    }
 
     esp_task_wdt_reset();
 }

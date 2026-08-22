@@ -26,7 +26,7 @@
     // ----------------------------------------------------
 #define ESP32_CAN_TX_PIN GPIO_NUM_16    // CAN Bus TX Pin
 #define ESP32_CAN_RX_PIN GPIO_NUM_17     // CAN Bus RX Pin
-#define ONE_WIRE_BUS     GPIO_NUM_36    // DS18B20 OneWire Data Pin
+#define SENSOR_PIN     GPIO_NUM_36    // Analog input for resistive sensor
 
 #define BOARD_NAME "Wemos D1 Mini ESP32"
 #define BOARD_INFO "Standard Wemos D1 Mini ESP32 configuration"
@@ -39,7 +39,7 @@
     // ----------------------------------------------------
 #define ESP32_CAN_TX_PIN GPIO_NUM_5     // CAN Bus TX Pin
 #define ESP32_CAN_RX_PIN GPIO_NUM_4     // CAN Bus RX Pin
-#define ONE_WIRE_BUS     GPIO_NUM_22    // DS18B20 OneWire Data Pin
+#define SENSOR_PIN     GPIO_NUM_36    // Analog input for resistive sensor
 
 #define BOARD_NAME "NodeMCU-32S"
 #define BOARD_INFO "NodeMCU-32S standard configuration"
@@ -59,7 +59,7 @@
 
 #define ESP32_CAN_TX_PIN GPIO_NUM_16    // CAN Bus TX Pin
 #define ESP32_CAN_RX_PIN GPIO_NUM_17     // CAN Bus RX Pin
-#define ONE_WIRE_BUS     GPIO_NUM_36    // DS18B20 OneWire Data Pin
+#define SENSOR_PIN     GPIO_NUM_36    // Analog input for resistive sensor
 
 #define BOARD_NAME "NMEA Sensor Board"
 #define BOARD_INFO "Standard Wemos D1 Mini ESP32 configuration"
@@ -79,7 +79,7 @@
 // RESISTIVE SENSOR CONFIGURATION
 // ============================================================================
 
-#define REFERENCE_RESISTOR   270.0f   // Reference resistor in voltage divider (Ohm)
+#define REFERENCE_RESISTOR   330.0f   // Reference resistor in voltage divider (Ohm)
 #define ADC_VOLTAGE           3.3f    // ADC reference voltage
 #define ADC_RESOLUTION       4095.0f  // 12-bit ADC resolution
 #define ADC_SAMPLES            10     // Number of ADC samples for averaging

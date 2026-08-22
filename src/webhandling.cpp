@@ -12,6 +12,11 @@
 #include <IotWebRootTab.h>
 #include <Preferences.h>
 
+#include <EventLogger.h>
+// WebSerial High Performance Mode - sendet Nachrichten sofort
+#define WSL_HIGH_PERF
+#include <WebSerial.h>
+
 // -- Configuration specific key. The value should be modified if config structure was changed.
 #define CONFIG_VERSION "A7"
 
@@ -68,8 +73,13 @@ Neotimer APModeTimer = Neotimer();
 bool DampingPaused = false;
 Neotimer DampingPauseTimer = Neotimer(15 * 60 * 1000); // 15 Minuten
 
+// WebSerial state tracking
+static int previousConnectionCount = 0;
+static unsigned long lastConnectionChange = 0;
+static bool waitingToSendHistory = false;
+
 // -- Method declarations.
-void onWebSerialMessage(uint8_t* data, size_t len);
+void handleWebSerialCommand(uint8_t* data, size_t len);
 void handleData(AsyncWebServerRequest* request);
 void handlePost(AsyncWebServerRequest* request);
 void handleReboot(AsyncWebServerRequest* request);
@@ -173,9 +183,7 @@ public:
 
 
 void wifiInit() {
-    Serial.begin(115200);
-    Serial.println();
-    Serial.println("starting up...");
+
 
     iotWebConf.setStatusPin(STATUS_PIN, ON_LEVEL);
     iotWebConf.setConfigPin(CONFIG_PIN);
@@ -232,41 +240,83 @@ void wifiInit() {
         }
     );
 
-	WebSerial.begin(&server, "/webserial");
-    WebSerial.onMessage(onWebSerialMessage);
-
     if (APModeOfflineTime > 0) {
         APModeTimer.start(APModeOfflineTime * 60 * 1000);
     }
 
-    Serial.println("Ready.");
+    // WebSerial Initialisierung
+    WebSerial.begin(&server, "/webserial");
+
+    // Handler für eingehende Nachrichten
+    WebSerial.onMessage(handleWebSerialCommand);
+
+    // Callback für Live-Updates registrieren
+    eventLogger.setLiveCallback([](const EventLogger::Event& event_) {
+        WebSerial.println(eventLogger.formatEvent(event_));
+        }
+    );
 }
 
 void wifiLoop() {
     // -- doLoop should be called as frequently as possible.
     iotWebConf.doLoop();
     ArduinoOTA.handle();
+    WebSerial.loop();
+
+    // Connection Count prüfen
+    int currentConnectionCount = WebSerial.getConnectionCount();
+
+    // Verbindungsänderung erkannt
+    if (currentConnectionCount != previousConnectionCount) {
+        if (currentConnectionCount > 0) {
+            // Neue Verbindung
+            waitingToSendHistory = true;
+            lastConnectionChange = millis();
+        }
+        previousConnectionCount = currentConnectionCount;
+    }
+
+    // Nach 500ms Historie senden
+    if (waitingToSendHistory && currentConnectionCount > 0 && (millis() - lastConnectionChange) >= 500) {
+        waitingToSendHistory = false;
+
+        WebSerial.println();
+        WebSerial.println("=== WebSerial ===");
+        WebSerial.println("Type 'help' for available commands");
+        WebSerial.println();
+
+        auto events_ = eventLogger.getEvents();
+        if (!events_.empty()) {
+            WebSerial.println("=== Event History (" + String(events_.size()) + " events) ===");
+            for (const auto& event_ : events_) {
+                WebSerial.println(eventLogger.formatEvent(event_));
+            }
+            WebSerial.println();
+        }
+        WebSerial.println("=== Live Events ===");
+        WebSerial.println();
+    }
 
     if (ParamsSave) {
-        Serial.println(F("Parameters are changed,save them"));
+        eventLogger.log(F("Parameters are changed,save them"));
         iotWebConf.saveConfig();
         ParamsSave = false;
     }
 
     if (APModeTimer.done()) {
-        Serial.println(F("AP mode offline time reached"));
+        eventLogger.log(F("AP mode offline time reached"));
         iotWebConf.goOffLine();
         APModeTimer.stop();
     }
-    
+
     // Check if damping pause timer is done
     if (DampingPaused && DampingPauseTimer.done()) {
         DampingPaused = false;
-        Serial.println(F("Damping pause ended, resuming normal operation"));
+        eventLogger.log(F("Damping pause ended, resuming normal operation"));
     }
 
     if (AsyncUpdater.isFinished()) {
-        Serial.println(F("Firmware update finished"));
+        eventLogger.log(F("Firmware update finished"));
         ShouldReboot = true;
     }
 }
@@ -275,17 +325,33 @@ void wifiConnected() {
     ArduinoOTA.begin();
 }
 
-void onWebSerialMessage(uint8_t* data, size_t len) {
-    String cmd_ = "";
+void handleWebSerialCommand(uint8_t* data, size_t len) {
+    String command_ = "";
     for (size_t i_ = 0; i_ < len; i_++) {
-        cmd_ += (char)data[i_];
+        command_ += (char)data[i_];
     }
-    cmd_.trim();
-
-    if (cmd_.startsWith("reboot")) {
+    command_.trim();
+    // Kommandos verarbeiten
+    if (command_ == "help") {
+        WebSerial.println("=== Available Commands ===");
+        WebSerial.println("  help     - Show this help");
+        WebSerial.println("  reboot   - Reboot the device");
+        WebSerial.println("  clear    - Clear event buffer");
+        WebSerial.println("  status   - Show system status");
+        WebSerial.println("  history  - Show all buffered events");
+        WebSerial.println("  verbose  - Toggle verbose logging (On/Off)");
+    }
+    else if (command_ == "reboot") {
+        WebSerial.println(">>> Rebooting device...");
+        eventLogger.log("Reboot requested via WebSerial");
+        delay(100);
         ShouldReboot = true;
     }
-    else if (cmd_.startsWith("status")) {
+    else if (command_ == "clear") {
+        eventLogger.clear();
+        WebSerial.println(">>> Event buffer cleared");
+    }
+    else if (command_ == "status") {
         WebSerial.println("========================================");
         WebSerial.println("Resistive Fluid Level Sensor Status");
         WebSerial.println("========================================");
@@ -295,16 +361,39 @@ void onWebSerialMessage(uint8_t* data, size_t len) {
         WebSerial.printf("Tank capacity: %d liters\n", tank.Capacity());
         WebSerial.printf("Fluid type: %s\n", tank.TypeName());
         WebSerial.println("========================================");
+
+        unsigned long uptime_ = millis() / 1000;
+        unsigned long days_ = uptime_ / 86400;
+        unsigned long hours_ = (uptime_ % 86400) / 3600;
+        unsigned long minutes_ = (uptime_ % 3600) / 60;
+        unsigned long seconds_ = uptime_ % 60;
+
+        WebSerial.printf("Uptime: %lud %02lu:%02lu:%02lu", days_, hours_, minutes_, seconds_);
+        WebSerial.println("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
+        WebSerial.println("Events in buffer: " + String(eventLogger.count()) + "/" + String(EVENT_BUFFER_SIZE));
     }
-    else if (cmd_.startsWith("help")) {
-        WebSerial.println("Available commands:");
-        WebSerial.println(" status  - Show sensor status");
-        WebSerial.println(" reboot  - Reboot device");
-        WebSerial.println(" help    - Show this help");
+    else if (command_ == "history") {
+        auto events_ = eventLogger.getEvents();
+        WebSerial.println("=== Event History (" + String(events_.size()) + " events) ===");
+        if (events_.empty()) {
+            WebSerial.println("(No events in buffer)");
+        }
+        else {
+            for (const auto& event_ : events_) {
+                WebSerial.println(eventLogger.formatEvent(event_));
+            }
+        }
+    }
+    else if (command_ == "verbose") {
+        debugMode = !debugMode;
+        WebSerial.println(">>> Verbose logging is now " + String(debugMode ? "enabled" : "disabled"));
     }
     else {
-        WebSerial.println("Unknown command. Type 'help' for available commands.");
+        WebSerial.println(">>> Unknown command: " + command_);
+        WebSerial.println(">>> Type 'help' for available commands");
     }
+
+    WebSerial.flush();
 }
 
 void handleToggleDamping(AsyncWebServerRequest* request) {
@@ -312,13 +401,13 @@ void handleToggleDamping(AsyncWebServerRequest* request) {
         // Re-enable damping
         DampingPaused = false;
         DampingPauseTimer.stop();
-        Serial.println(F("Damping re-enabled by user"));
+        eventLogger.log(F("Damping re-enabled by user"));
     }
     else {
         // Pause damping
         DampingPaused = true;
         DampingPauseTimer.restart();
-        Serial.println(F("Damping paused for 15 minutes"));
+        eventLogger.log(F("Damping paused for 15 minutes"));
     }
     request->send(200, "text/plain", "OK");
 }
@@ -353,7 +442,7 @@ void handleData(AsyncWebServerRequest* request) {
 
 void handlePost(AsyncWebServerRequest* request) {
     if (request->hasParam("reset", true)) {
-        Serial.println(F("Resetting to defaults..."));
+        eventLogger.log(F("Resetting to defaults..."));
 
         Config.applyDefaultValue();
         tank.applyDefaultValue();
