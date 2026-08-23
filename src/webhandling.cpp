@@ -85,6 +85,7 @@ void handlePost(AsyncWebServerRequest* request);
 void handleReboot(AsyncWebServerRequest* request);
 void handleRoot(AsyncWebServerRequest* request);
 void handleToggleDamping(AsyncWebServerRequest* request);
+void handleConfigSavedPage(iotwebconf::WebRequestWrapper* webRequestWrapper);
 
 // -- Callback methods.
 void wifiConnected();
@@ -211,6 +212,7 @@ void wifiInit() {
 
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
+    iotWebConf.setConfigSavedPage(&handleConfigSavedPage);
 
     iotWebConf.getApTimeoutParameter()->visible = true;
 
@@ -568,6 +570,10 @@ void handleRoot(AsyncWebServerRequest* request) {
 
     response_->addHeader("Server", "ESP Async Web Server");
     request->send(response_);
+}
+void handleConfigSavedPage(iotwebconf::WebRequestWrapper* webRequestWrapper) {
+    webRequestWrapper->sendHeader("Location", "/");
+    webRequestWrapper->send(302, "text/plain", "");
 }
 
 void convertParams() {
